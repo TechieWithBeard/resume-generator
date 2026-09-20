@@ -2,11 +2,12 @@ import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ResumeGeneratorService } from '../../services/resume-generator.service';
 import { CardComponent } from '../../shared/components/card/card.component';
+import { GitDiffViewerComponent } from '../git-diff-viewer/git-diff-viewer.component';
 
 @Component({
   selector: 'app-resume-preview',
   standalone: true,
-  imports: [CommonModule, CardComponent],
+  imports: [CommonModule, CardComponent, GitDiffViewerComponent],
   templateUrl: './resume-preview.component.html',
   styleUrl: './resume-preview.component.scss',
 })
@@ -32,7 +33,7 @@ export class ResumePreviewComponent {
     this.resumeService.selectTemplate(tmplId);
   }
 
-  onSetViewMode(mode: 'single' | 'split'): void {
+  onSetViewMode(mode: 'single' | 'split' | 'git-diff'): void {
     this.resumeService.setViewMode(mode);
   }
 

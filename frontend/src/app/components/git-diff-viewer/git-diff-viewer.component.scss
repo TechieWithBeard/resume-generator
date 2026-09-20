@@ -1,0 +1,100 @@
+.git-diff-container {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* Line styling */
+  .diff-line-row {
+    transition: background-color 0.1s ease;
+
+    &.line-added {
+      background-color: rgba(35, 134, 54, 0.15);
+      color: #7ee787;
+
+      &:hover {
+        background-color: rgba(35, 134, 54, 0.22);
+      }
+    }
+
+    &.line-deleted {
+      background-color: rgba(218, 54, 51, 0.15);
+      color: #ff7b72;
+
+      &:hover {
+        background-color: rgba(218, 54, 51, 0.22);
+      }
+    }
+
+    &.line-unchanged {
+      color: #8b949e;
+
+      &:hover {
+        background-color: rgba(110, 118, 129, 0.08);
+      }
+    }
+  }
+
+  /* Gutter columns */
+  .gutter-num {
+    font-size: 11px;
+    background-color: #161b22;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  .gutter-sign {
+    font-size: 12px;
+    background-color: #161b22;
+  }
+
+  /* Intra-line word highlights */
+  .word-del {
+    background-color: rgba(248, 81, 73, 0.4);
+    color: #ffdcd7;
+    text-decoration: line-through;
+    padding: 1px 3px;
+    border-radius: 2px;
+    font-weight: 700;
+  }
+
+  .word-ins {
+    background-color: rgba(46, 160, 67, 0.45);
+    color: #aff5b4;
+    padding: 1px 3px;
+    border-radius: 2px;
+    font-weight: 700;
+  }
+
+  .word-kw {
+    background-color: rgba(56, 139, 253, 0.35);
+    color: #79c0ff;
+    border: 1px solid rgba(56, 139, 253, 0.6);
+    padding: 0 4px;
+    border-radius: 3px;
+    font-weight: 800;
+  }
+
+  /* Split diff table */
+  .split-diff-row {
+    &:hover {
+      background-color: rgba(110, 118, 129, 0.06);
+    }
+  }
+
+  /* Scrollbar customization */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0d1117;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 4px;
+
+    &:hover {
+      background: #8b949e;
+    }
+  }
+}

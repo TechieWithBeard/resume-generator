@@ -23,7 +23,17 @@
           title="Side-by-side comparison between Ground Truth Base Profile and Tailored Document"
         >
           <span>⚖️</span>
-          <span>Side-by-Side Diff</span>
+          <span>Side-by-Side</span>
+        </button>
+        <button
+          type="button"
+          class="px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all duration-150 cursor-pointer"
+          [ngClass]="viewMode() === 'git-diff' ? 'bg-[#0d1117] text-[#3fb950] shadow-sm font-bold border border-[#30363d]' : 'text-slate-600 hover:text-slate-900'"
+          (click)="onSetViewMode('git-diff')"
+          title="Git Diff Editor with syntax-highlighted hunks and patch export"
+        >
+          <span class="font-mono text-[11px] font-extrabold text-[#238636]">+/-</span>
+          <span>Git Diff Editor</span>
         </button>
       </div>
 
@@ -207,7 +217,7 @@
         </div>
       }
     </div>
-  } @else {
+  } @else if (viewMode() === 'split') {
     <!-- Side-by-Side Split Diff Comparison View -->
     <div class="p-3 sm:p-4 bg-slate-200/90 flex-1 overflow-auto">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full min-h-[780px]">
@@ -269,6 +279,11 @@
           </div>
         </div>
       </div>
+    </div>
+  } @else if (viewMode() === 'git-diff') {
+    <!-- Full-featured Git Diff Editor -->
+    <div class="flex-1 p-2 sm:p-3.5 bg-slate-900 overflow-auto flex flex-col">
+      <app-git-diff-viewer class="flex-1 min-h-[780px]"></app-git-diff-viewer>
     </div>
   }
 </app-card>

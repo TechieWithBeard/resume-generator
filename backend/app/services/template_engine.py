@@ -166,8 +166,8 @@ class TemplateEngine:
                         out_tokens.append(f'<mark class="diff-kw-term">{w}</mark>')
                     else:
                         out_tokens.append(w)
-            elif tag in ("insert", "replace"):
-                cls = "diff-text-added" if tag == "insert" else "diff-text-adapted"
+            elif tag == "replace":
+                del_chunk = " ".join(base_words[i1:i2])
                 sub_tokens = []
                 for w in new_words[j1:j2]:
                     w_clean = re.sub(r"[^\w\+\#]", "", w.lower())
@@ -175,10 +175,23 @@ class TemplateEngine:
                         sub_tokens.append(f'<strong class="diff-kw-match">{w}</strong>')
                     else:
                         sub_tokens.append(w)
-                chunk = " ".join(sub_tokens)
-                out_tokens.append(f'<mark class="{cls}">{chunk}</mark>')
+                ins_chunk = " ".join(sub_tokens)
+                del_html = f'<del class="git-diff-del"><span class="diff-sign">-</span>{del_chunk}</del>'
+                ins_html = f'<ins class="git-diff-ins diff-text-adapted"><span class="diff-sign">+</span>{ins_chunk}</ins>'
+                out_tokens.append(f'{del_html} {ins_html}')
+            elif tag == "insert":
+                sub_tokens = []
+                for w in new_words[j1:j2]:
+                    w_clean = re.sub(r"[^\w\+\#]", "", w.lower())
+                    if w_clean in target_terms or any(t in w_clean for t in target_terms if len(t) > 3):
+                        sub_tokens.append(f'<strong class="diff-kw-match">{w}</strong>')
+                    else:
+                        sub_tokens.append(w)
+                ins_chunk = " ".join(sub_tokens)
+                out_tokens.append(f'<ins class="git-diff-ins diff-text-added"><span class="diff-sign">+</span>{ins_chunk}</ins>')
             elif tag == "delete":
-                pass
+                del_chunk = " ".join(base_words[i1:i2])
+                out_tokens.append(f'<del class="git-diff-del"><span class="diff-sign">-</span>{del_chunk}</del>')
 
         return " ".join(out_tokens)
 
@@ -211,7 +224,7 @@ class TemplateEngine:
                 sub_tokens.append(f'<strong class="diff-kw-match">{w}</strong>')
             else:
                 sub_tokens.append(w)
-        return f'<mark class="diff-text-added">{" ".join(sub_tokens)}</mark>', True, has_target_kw
+        return f'<ins class="git-diff-ins diff-text-added"><span class="diff-sign">+</span>{" ".join(sub_tokens)}</ins>', True, has_target_kw
 
     def render(
         self,
@@ -279,16 +292,20 @@ class TemplateEngine:
 
         diff_legend_html = ""
         if highlight_diff:
-            diff_legend_html = """
-            <div class="cv-diff-banner avoid-break" style="background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:8px 12px; margin-bottom:14px; font-size:8pt; color:#166534;">
-                <div style="font-weight:700; margin-bottom:5px; display:flex; align-items:center; gap:6px;">
-                    <span>🔍</span><strong>DIFF VIEW ACTIVE:</strong> Real-time word-level audit of tailored text &amp; keywords
+            diff_legend_html = f"""
+            <div class="cv-diff-banner avoid-break" style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:10px 14px; margin-bottom:16px; font-size:8pt; color:#c9d1d9; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">
+                <div style="font-weight:700; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="background:#238636; color:#ffffff; font-size:7pt; font-weight:800; padding:2px 6px; border-radius:3px; letter-spacing:0.5px;">GIT DIFF</span>
+                        <span style="color:#58a6ff; font-weight:700;">DIFF VIEW ACTIVE: git diff base_profile &rarr; tailored_profile</span>
+                    </div>
+                    <span style="color:#8b949e; font-size:7.5pt;">origin/ground-truth &rarr; target/{target_role or "tailored"}</span>
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:7.5pt;">
-                    <span style="background:#bbf7d0; color:#14532d; border:1px solid #86efac; padding:1px 6px; border-radius:3px; font-weight:700;">🟢 + Added Text</span>
-                    <span style="background:#fef08a; color:#713f12; border:1px solid #fde047; padding:1px 6px; border-radius:3px; font-weight:700;">🟡 ~ Adapted Text</span>
-                    <span style="background:#bae6fd; color:#0369a1; border:1px solid #7dd3fc; padding:1px 6px; border-radius:3px; font-weight:700;">🔵 ★ Target Keyword</span>
-                    <span style="background:#fff; color:#475569; border:1px solid #cbd5e1; padding:1px 6px; border-radius:3px; font-weight:600;">⚪ Verified Invariant</span>
+                    <span style="background:#ffebe9; color:#cf222e; border:1px solid #ffc1ba; padding:1px 6px; border-radius:3px; font-weight:700;">🔴 - Removed from Base</span>
+                    <span style="background:#dafbe1; color:#116329; border:1px solid #86efac; padding:1px 6px; border-radius:3px; font-weight:700;">🟢 + Added / Tailored Profile</span>
+                    <span style="background:#ddf4ff; color:#0969da; border:1px solid #54aeff; padding:1px 6px; border-radius:3px; font-weight:700;">🔵 ★ Target Keyword Match</span>
+                    <span style="background:#21262d; color:#8b949e; border:1px solid #30363d; padding:1px 6px; border-radius:3px; font-weight:600;">⚪ Invariant Facts Preserved</span>
                 </div>
             </div>
             """
@@ -572,24 +589,40 @@ class TemplateEngine:
     padding-left: 6px;
     border-radius: 2px;
   }}
-  mark.diff-text-added {{
-    background-color: #bbf7d0 !important;
-    color: #14532d !important;
-    font-weight: 600;
-    border-radius: 3px;
+  del.git-diff-del {{
+    background-color: #ffebe9 !important;
+    color: #cf222e !important;
+    text-decoration: line-through !important;
     padding: 1px 4px;
-    box-shadow: 0 0 0 1px #86efac;
-    text-decoration: none;
+    border-radius: 3px;
+    border: 1px solid #ffc1ba;
+    font-size: 0.95em;
+    margin-right: 3px;
+    display: inline;
+  }}
+  ins.git-diff-ins, mark.diff-text-added, mark.diff-text-adapted {{
+    background-color: #dafbe1 !important;
+    color: #116329 !important;
+    text-decoration: none !important;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid #86efac;
+    font-weight: 600;
+    display: inline;
   }}
   mark.diff-text-adapted {{
     background-color: #fef08a !important;
     color: #713f12 !important;
-    font-weight: 600;
-    border-radius: 3px;
-    padding: 1px 4px;
-    box-shadow: 0 0 0 1px #fde047;
-    text-decoration: none;
+    border-color: #fde047;
   }}
+  .diff-sign {{
+    user-select: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 800;
+    margin-right: 2px;
+  }}
+  del.git-diff-del .diff-sign {{ color: #cf222e; }}
+  ins.git-diff-ins .diff-sign {{ color: #116329; }}
   mark.diff-kw-term {{
     background-color: #bae6fd !important;
     color: #0369a1 !important;
@@ -605,14 +638,17 @@ class TemplateEngine:
     text-decoration: underline;
   }}
   @media print {{
-    mark.diff-text-added, mark.diff-text-adapted, mark.diff-kw-term {{
+    del.git-diff-del {{ display: none !important; }}
+    ins.git-diff-ins, mark.diff-text-added, mark.diff-text-adapted, mark.diff-kw-term {{
       background-color: transparent !important;
       color: inherit !important;
       font-weight: inherit !important;
       box-shadow: none !important;
+      border: none !important;
       padding: 0 !important;
       text-decoration: none !important;
     }}
+    .diff-sign {{ display: none !important; }}
     strong.diff-kw-match {{
       color: inherit !important;
       font-weight: inherit !important;
@@ -766,14 +802,20 @@ class TemplateEngine:
 
         diff_legend_html = ""
         if highlight_diff:
-            diff_legend_html = """
-            <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:4px; padding:8px 12px; margin-bottom:14px; font-size:8pt; color:#166534; font-family:sans-serif;">
-                <div style="font-weight:700; margin-bottom:5px;">🔍 DIFF VIEW ACTIVE: Real-time word-level audit of tailored text &amp; keywords</div>
-                <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:7.5pt;">
-                    <span style="background:#bbf7d0; color:#14532d; border:1px solid #86efac; padding:1px 6px; border-radius:3px; font-weight:700;">🟢 + Added Text</span>
-                    <span style="background:#fef08a; color:#713f12; border:1px solid #fde047; padding:1px 6px; border-radius:3px; font-weight:700;">🟡 ~ Adapted Text</span>
-                    <span style="background:#bae6fd; color:#0369a1; border:1px solid #7dd3fc; padding:1px 6px; border-radius:3px; font-weight:700;">🔵 ★ Target Keyword</span>
-                    <span style="background:#fff; color:#475569; border:1px solid #cbd5e1; padding:1px 6px; border-radius:3px; font-weight:600;">⚪ Verified Invariant</span>
+            diff_legend_html = f"""
+            <div class="cv-diff-banner avoid-break" style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:10px 14px; margin-bottom:16px; font-size:8pt; color:#c9d1d9; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">
+                <div style="font-weight:700; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="background:#238636; color:#ffffff; font-size:7pt; font-weight:800; padding:2px 6px; border-radius:3px; letter-spacing:0.5px;">GIT DIFF</span>
+                        <span style="color:#58a6ff; font-weight:700;">DIFF VIEW ACTIVE: git diff base_profile &rarr; tailored_profile</span>
+                    </div>
+                    <span style="color:#8b949e; font-size:7.5pt;">origin/ground-truth &rarr; target/{target_role or "tailored"}</span>
+                </div>
+                <div style="display:flex; flex-wrap:gap; gap:8px; font-size:7.5pt;">
+                    <span style="background:#ffebe9; color:#cf222e; border:1px solid #ffc1ba; padding:1px 6px; border-radius:3px; font-weight:700;">🔴 - Removed from Base</span>
+                    <span style="background:#dafbe1; color:#116329; border:1px solid #86efac; padding:1px 6px; border-radius:3px; font-weight:700;">🟢 + Added / Tailored Profile</span>
+                    <span style="background:#ddf4ff; color:#0969da; border:1px solid #54aeff; padding:1px 6px; border-radius:3px; font-weight:700;">🔵 ★ Target Keyword Match</span>
+                    <span style="background:#21262d; color:#8b949e; border:1px solid #30363d; padding:1px 6px; border-radius:3px; font-weight:600;">⚪ Invariant Facts Preserved</span>
                 </div>
             </div>
             """
@@ -893,24 +935,40 @@ class TemplateEngine:
   .contacts {{ text-align: center; font-size: 9.5pt; border-bottom: 1px solid #222; padding-bottom: 12px; margin-bottom: 18px; }}
   .sec-heading, .section-title {{ font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #aaa; padding-bottom: 2px; margin: 16px 0 10px 0; letter-spacing: 0.5px; }}
   @media print {{ body {{ background: #fff; padding: 0; }} .paper, .resume-paper {{ box-shadow: none; padding: 0; }} }}
-  mark.diff-text-added {{
-    background-color: #bbf7d0 !important;
-    color: #14532d !important;
-    font-weight: 600;
-    border-radius: 3px;
+  del.git-diff-del {{
+    background-color: #ffebe9 !important;
+    color: #cf222e !important;
+    text-decoration: line-through !important;
     padding: 1px 4px;
-    box-shadow: 0 0 0 1px #86efac;
-    text-decoration: none;
+    border-radius: 3px;
+    border: 1px solid #ffc1ba;
+    font-size: 0.95em;
+    margin-right: 3px;
+    display: inline;
+  }}
+  ins.git-diff-ins, mark.diff-text-added, mark.diff-text-adapted {{
+    background-color: #dafbe1 !important;
+    color: #116329 !important;
+    text-decoration: none !important;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid #86efac;
+    font-weight: 600;
+    display: inline;
   }}
   mark.diff-text-adapted {{
     background-color: #fef08a !important;
     color: #713f12 !important;
-    font-weight: 600;
-    border-radius: 3px;
-    padding: 1px 4px;
-    box-shadow: 0 0 0 1px #fde047;
-    text-decoration: none;
+    border-color: #fde047;
   }}
+  .diff-sign {{
+    user-select: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 800;
+    margin-right: 2px;
+  }}
+  del.git-diff-del .diff-sign {{ color: #cf222e; }}
+  ins.git-diff-ins .diff-sign {{ color: #116329; }}
   mark.diff-kw-term {{
     background-color: #bae6fd !important;
     color: #0369a1 !important;
@@ -926,14 +984,17 @@ class TemplateEngine:
     text-decoration: underline;
   }}
   @media print {{
-    mark.diff-text-added, mark.diff-text-adapted, mark.diff-kw-term {{
+    del.git-diff-del {{ display: none !important; }}
+    ins.git-diff-ins, mark.diff-text-added, mark.diff-text-adapted, mark.diff-kw-term {{
       background-color: transparent !important;
       color: inherit !important;
+      border: none !important;
       font-weight: inherit !important;
       box-shadow: none !important;
       padding: 0 !important;
       text-decoration: none !important;
     }}
+    .diff-sign {{ display: none !important; }}
     strong.diff-kw-match {{
       color: inherit !important;
       font-weight: inherit !important;
@@ -1832,24 +1893,40 @@ class TemplateEngine:
     font-size: 7.5pt;
     color: var(--text-muted);
   }}
-  mark.diff-text-added {{
-    background-color: #bbf7d0 !important;
-    color: #14532d !important;
-    font-weight: 600;
-    border-radius: 3px;
+  del.git-diff-del {{
+    background-color: #ffebe9 !important;
+    color: #cf222e !important;
+    text-decoration: line-through !important;
     padding: 1px 4px;
-    box-shadow: 0 0 0 1px #86efac;
-    text-decoration: none;
+    border-radius: 3px;
+    border: 1px solid #ffc1ba;
+    font-size: 0.95em;
+    margin-right: 3px;
+    display: inline;
+  }}
+  ins.git-diff-ins, mark.diff-text-added, mark.diff-text-adapted {{
+    background-color: #dafbe1 !important;
+    color: #116329 !important;
+    text-decoration: none !important;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid #86efac;
+    font-weight: 600;
+    display: inline;
   }}
   mark.diff-text-adapted {{
     background-color: #fef08a !important;
     color: #713f12 !important;
-    font-weight: 600;
-    border-radius: 3px;
-    padding: 1px 4px;
-    box-shadow: 0 0 0 1px #fde047;
-    text-decoration: none;
+    border-color: #fde047;
   }}
+  .diff-sign {{
+    user-select: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 800;
+    margin-right: 2px;
+  }}
+  del.git-diff-del .diff-sign {{ color: #cf222e; }}
+  ins.git-diff-ins .diff-sign {{ color: #116329; }}
   mark.diff-kw-term {{
     background-color: #bae6fd !important;
     color: #0369a1 !important;
@@ -1889,14 +1966,17 @@ class TemplateEngine:
       padding: 0 !important;
       font-weight: 600;
     }}
-    mark.diff-text-added, mark.diff-text-adapted, mark.diff-kw-term {{
+    del.git-diff-del {{ display: none !important; }}
+    ins.git-diff-ins, mark.diff-text-added, mark.diff-text-adapted, mark.diff-kw-term {{
       background-color: transparent !important;
       color: inherit !important;
       font-weight: inherit !important;
       box-shadow: none !important;
+      border: none !important;
       padding: 0 !important;
       text-decoration: none !important;
     }}
+    .diff-sign {{ display: none !important; }}
     strong.diff-kw-match {{
       color: inherit !important;
       font-weight: inherit !important;

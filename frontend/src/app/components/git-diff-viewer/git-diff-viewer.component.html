@@ -1,0 +1,281 @@
+<div class="git-diff-container flex flex-col h-full bg-[#0d1117] text-[#c9d1d9] rounded-xl overflow-hidden shadow-2xl border border-[#30363d]">
+  <!-- Top Command & Branch Bar -->
+  <div class="diff-top-bar px-4 py-3 bg-[#161b22] border-b border-[#30363d] flex flex-wrap items-center justify-between gap-3">
+    <!-- Left: Git Branch & File Information -->
+    <div class="flex flex-wrap items-center gap-2.5 text-xs font-mono">
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#21262d] border border-[#30363d]">
+        <span class="text-[#58a6ff]">🔀</span>
+        <span class="text-slate-400">compare:</span>
+        <span class="text-[#f0883e] font-semibold">base/ground-truth</span>
+        <span class="text-slate-500">...</span>
+        <span class="text-[#7ee787] font-semibold">{{ tailoredResume()?.target_role ? 'target/tailored' : 'head/tailored' }}</span>
+      </div>
+
+      <!-- Stats Badges -->
+      <div class="flex items-center gap-1.5">
+        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#238636]/20 text-[#3fb950] border border-[#238636]/40">
+          +{{ totalStats().additions }}
+        </span>
+        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#da3633]/20 text-[#f85149] border border-[#da3633]/40">
+          -{{ totalStats().deletions }}
+        </span>
+        <span class="px-2 py-0.5 rounded-md text-[11px] text-slate-400 bg-[#21262d] border border-[#30363d]">
+          {{ totalStats().hunksCount }} sections
+        </span>
+      </div>
+
+      @if (auditReport()?.match_score) {
+        <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#1f6feb]/20 text-[#58a6ff] border border-[#1f6feb]/40">
+          🎯 {{ auditReport()?.match_score }}% Target Fit
+        </span>
+      }
+    </div>
+
+    <!-- Right: View Mode & Action Controls -->
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Unified vs Split Switcher -->
+      <div class="inline-flex bg-[#0d1117] p-0.5 rounded-lg border border-[#30363d]">
+        <button
+          type="button"
+          (click)="onSetDiffMode('unified')"
+          class="px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer"
+          [ngClass]="diffMode() === 'unified' ? 'bg-[#21262d] text-white shadow-sm font-bold' : 'text-slate-400 hover:text-slate-200'"
+          title="Unified single column diff"
+        >
+          Unified
+        </button>
+        <button
+          type="button"
+          (click)="onSetDiffMode('split')"
+          class="px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer"
+          [ngClass]="diffMode() === 'split' ? 'bg-[#21262d] text-white shadow-sm font-bold' : 'text-slate-400 hover:text-slate-200'"
+          title="Side-by-side split comparison"
+        >
+          Split
+        </button>
+      </div>
+
+      <!-- Filter Changes Only Toggle -->
+      <button
+        type="button"
+        (click)="onToggleFilter()"
+        class="px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer"
+        [ngClass]="filterChangesOnly() ? 'bg-[#238636]/20 text-[#3fb950] border-[#238636]' : 'bg-[#21262d] text-slate-300 border-[#30363d] hover:bg-[#30363d]'"
+        title="Hide unchanged invariant lines"
+      >
+        {{ filterChangesOnly() ? '⚡ Changes Only' : 'All Lines' }}
+      </button>
+
+      <!-- Expand / Collapse All -->
+      <div class="inline-flex rounded-lg border border-[#30363d] overflow-hidden">
+        <button
+          type="button"
+          (click)="onExpandAll()"
+          class="px-2 py-1 text-[11px] font-semibold bg-[#21262d] hover:bg-[#30363d] text-slate-300 border-r border-[#30363d] cursor-pointer"
+          title="Expand all diff hunks"
+        >
+          Expand
+        </button>
+        <button
+          type="button"
+          (click)="onCollapseAll()"
+          class="px-2 py-1 text-[11px] font-semibold bg-[#21262d] hover:bg-[#30363d] text-slate-300 cursor-pointer"
+          title="Collapse all diff hunks"
+        >
+          Collapse
+        </button>
+      </div>
+
+      <!-- Copy Patch Button -->
+      <button
+        type="button"
+        (click)="onCopyPatch()"
+        class="px-3 py-1 text-xs font-semibold rounded-lg bg-[#238636] hover:bg-[#2ea043] text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+        title="Copy standard git diff patch to clipboard"
+      >
+        <span>{{ copiedPatch() ? '✓' : '📋' }}</span>
+        <span>{{ copiedPatch() ? 'Copied Patch!' : 'Copy Patch' }}</span>
+      </button>
+
+      <!-- Download .diff Button -->
+      <button
+        type="button"
+        (click)="onDownloadPatch()"
+        class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#21262d] hover:bg-[#30363d] text-slate-200 border border-[#30363d] transition-all cursor-pointer flex items-center gap-1"
+        title="Download unified .diff file"
+      >
+        <span>⬇️</span>
+        <span>.diff</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Diff Body: Hunks List -->
+  <div class="diff-body flex-1 overflow-auto p-3 sm:p-4 space-y-4">
+    @for (hunk of diffHunks(); track hunk.id) {
+      <div class="diff-hunk-card rounded-lg border border-[#30363d] bg-[#0d1117] overflow-hidden shadow-md">
+        <!-- Hunk Header -->
+        <div
+          class="hunk-header px-3.5 py-2.5 bg-[#161b22] border-b border-[#30363d] flex items-center justify-between cursor-pointer hover:bg-[#21262d] transition-colors"
+          (click)="onToggleHunk(hunk.id)"
+        >
+          <div class="flex items-center gap-2.5 text-xs font-mono">
+            <span class="text-slate-400 text-[10px] transform transition-transform duration-150" [class.rotate-90]="!hunk.collapsed">
+              ▶
+            </span>
+            <span class="font-bold text-white">{{ hunk.title }}</span>
+            <span class="text-slate-500 text-[11px]">{{ hunk.fileLabel }}</span>
+          </div>
+
+          <div class="flex items-center gap-2 font-mono text-[11px]">
+            @if (hunk.additions > 0) {
+              <span class="text-[#3fb950] font-bold">+{{ hunk.additions }}</span>
+            }
+            @if (hunk.deletions > 0) {
+              <span class="text-[#f85149] font-bold">-{{ hunk.deletions }}</span>
+            }
+            @if (hunk.additions === 0 && hunk.deletions === 0) {
+              <span class="text-slate-400 text-[10px]">Verified Invariant</span>
+            }
+          </div>
+        </div>
+
+        <!-- Hunk Content -->
+        @if (!hunk.collapsed) {
+          <!-- Chunk Range Header (Git style) -->
+          <div class="hunk-range-bar px-4 py-1 bg-[#161b22]/70 border-b border-[#30363d] font-mono text-[11px] text-[#58a6ff]">
+            {{ hunk.header }}
+          </div>
+
+          @if (diffMode() === 'unified') {
+            <!-- Unified View -->
+            <div class="unified-diff-table font-mono text-[12px] leading-[20px] overflow-x-auto">
+              <table class="w-full border-collapse">
+                <tbody>
+                  @for (line of hunk.lines; track $index) {
+                    @if (!filterChangesOnly() || line.type !== 'unchanged') {
+                      <tr
+                        class="diff-line-row"
+                        [ngClass]="{
+                          'line-added': line.type === 'added',
+                          'line-deleted': line.type === 'deleted',
+                          'line-unchanged': line.type === 'unchanged'
+                        }"
+                      >
+                        <!-- Gutter Old Line -->
+                        <td class="gutter-num select-none w-10 text-right pr-2 text-slate-500 border-r border-[#30363d]">
+                          {{ line.oldLineNum || '' }}
+                        </td>
+                        <!-- Gutter New Line -->
+                        <td class="gutter-num select-none w-10 text-right pr-2 text-slate-500 border-r border-[#30363d]">
+                          {{ line.newLineNum || '' }}
+                        </td>
+                        <!-- Sign Column -->
+                        <td class="gutter-sign select-none w-6 text-center font-bold">
+                          @if (line.type === 'added') {
+                            <span class="text-[#3fb950]">+</span>
+                          } @else if (line.type === 'deleted') {
+                            <span class="text-[#f85149]">-</span>
+                          } @else {
+                            <span class="text-slate-600">&nbsp;</span>
+                          }
+                        </td>
+                        <!-- Code Column -->
+                        <td class="line-content px-2 py-0.5 whitespace-pre-wrap break-words">
+                          @if (line.words && line.words.length > 0) {
+                            @for (w of line.words; track $index) {
+                              @if (w.type === 'deleted') {
+                                <span class="word-del">{{ w.text }} </span>
+                              } @else if (w.type === 'added') {
+                                <span class="word-ins">{{ w.text }} </span>
+                              } @else if (w.type === 'keyword') {
+                                <span class="word-kw">{{ w.text }} </span>
+                              } @else {
+                                <span>{{ w.text }} </span>
+                              }
+                            }
+                          } @else {
+                            <span>{{ line.text }}</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <!-- Split View -->
+            <div class="split-diff-table font-mono text-[12px] leading-[20px] overflow-x-auto">
+              <table class="w-full border-collapse">
+                <tbody>
+                  @for (row of hunk.splitRows; track $index) {
+                    @if (!filterChangesOnly() || (row.left?.type !== 'unchanged' || row.right?.type !== 'unchanged')) {
+                      <tr class="split-diff-row">
+                        <!-- Left Pane: Base Resume -->
+                        <td class="gutter-num select-none w-10 text-right pr-2 text-slate-500 border-r border-[#30363d] bg-[#161b22]/50">
+                          {{ row.left?.oldLineNum || '' }}
+                        </td>
+                        <td class="gutter-sign select-none w-5 text-center font-bold" [ngClass]="row.left?.type === 'deleted' ? 'bg-[#da3633]/15 text-[#f85149]' : ''">
+                          {{ row.left?.type === 'deleted' ? '-' : '' }}
+                        </td>
+                        <td
+                          class="split-content w-1/2 px-2 py-0.5 whitespace-pre-wrap break-words border-r border-[#30363d]"
+                          [ngClass]="row.left?.type === 'deleted' ? 'bg-[#da3633]/10 text-[#ff7b72]' : 'text-slate-300'"
+                        >
+                          @if (row.left) {
+                            @if (row.left.words && row.left.words.length > 0) {
+                              @for (w of row.left.words; track $index) {
+                                <span [class.word-del]="w.type === 'deleted'">{{ w.text }} </span>
+                              }
+                            } @else {
+                              <span>{{ row.left.text }}</span>
+                            }
+                          }
+                        </td>
+
+                        <!-- Right Pane: Tailored Resume -->
+                        <td class="gutter-num select-none w-10 text-right pr-2 text-slate-500 border-r border-[#30363d] bg-[#161b22]/50">
+                          {{ row.right?.newLineNum || '' }}
+                        </td>
+                        <td class="gutter-sign select-none w-5 text-center font-bold" [ngClass]="row.right?.type === 'added' ? 'bg-[#238636]/15 text-[#3fb950]' : ''">
+                          {{ row.right?.type === 'added' ? '+' : '' }}
+                        </td>
+                        <td
+                          class="split-content w-1/2 px-2 py-0.5 whitespace-pre-wrap break-words"
+                          [ngClass]="row.right?.type === 'added' ? 'bg-[#238636]/10 text-[#7ee787]' : 'text-slate-300'"
+                        >
+                          @if (row.right) {
+                            @if (row.right.words && row.right.words.length > 0) {
+                              @for (w of row.right.words; track $index) {
+                                @if (w.type === 'keyword') {
+                                  <span class="word-kw">{{ w.text }} </span>
+                                } @else if (w.type === 'added') {
+                                  <span class="word-ins">{{ w.text }} </span>
+                                } @else {
+                                  <span>{{ w.text }} </span>
+                                }
+                              }
+                            } @else {
+                              <span>{{ row.right.text }}</span>
+                            }
+                          }
+                        </td>
+                      </tr>
+                    }
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        }
+      </div>
+    } @empty {
+      <div class="text-center py-24 text-slate-500">
+        <div class="text-5xl mb-3">🌿</div>
+        <div class="text-sm font-semibold">No diff found between Base Profile and Tailored Document.</div>
+        <div class="text-xs text-slate-600 mt-1">Both documents are identical invariant representations.</div>
+      </div>
+    }
+  </div>
+</div>

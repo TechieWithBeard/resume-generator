@@ -37,7 +37,7 @@ export class ResumeGeneratorService {
   readonly selectedTemplate = signal<string>('modern');
   readonly documentMode = signal<'resume' | 'cv'>('resume');
   readonly comparisonMode = signal<boolean>(false);
-  readonly viewMode = signal<'single' | 'split'>('single');
+  readonly viewMode = signal<'single' | 'split' | 'git-diff'>('single');
   readonly baseRenderedHtml = signal<string>('');
   readonly isFullscreen = signal<boolean>(false);
   readonly previewZoom = signal<number>(100);
@@ -310,7 +310,7 @@ export class ResumeGeneratorService {
     return '';
   }
 
-  async setViewMode(mode: 'single' | 'split'): Promise<void> {
+  async setViewMode(mode: 'single' | 'split' | 'git-diff'): Promise<void> {
     this.viewMode.set(mode);
     if (mode === 'split') {
       await this.renderBaseResume();
