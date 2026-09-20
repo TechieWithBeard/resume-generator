@@ -209,75 +209,373 @@
           </div>
 
           <!-- Verified Experience -->
-          <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Verified Professional Experience</span>
-              <span class="text-[11px] text-slate-500 font-mono">{{ formData.experience.length }} Roles</span>
+          <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Verified Professional Experience</span>
+                <span class="text-[11px] text-slate-500 font-mono bg-slate-200/70 px-2 py-0.5 rounded">{{ formData.experience.length }} Roles</span>
+              </div>
+              <div class="flex items-center gap-2">
+                @if (formData.experience.length > 0) {
+                  <button
+                    type="button"
+                    class="text-[11px] text-slate-600 hover:text-slate-900 font-medium px-2 py-1 rounded hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    (click)="expandAllExp()"
+                    title="Expand all experience roles for editing"
+                  >
+                    Expand All
+                  </button>
+                  <button
+                    type="button"
+                    class="text-[11px] text-slate-600 hover:text-slate-900 font-medium px-2 py-1 rounded hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    (click)="collapseAllExp()"
+                    title="Collapse all experience roles"
+                  >
+                    Collapse All
+                  </button>
+                }
+                <button
+                  type="button"
+                  class="px-2.5 py-1 text-xs font-bold rounded-lg bg-sky-600 hover:bg-sky-700 text-white shadow-xs flex items-center gap-1 transition-colors cursor-pointer"
+                  (click)="addExperience()"
+                >
+                  <span>+</span>
+                  <span>Add Experience Role</span>
+                </button>
+              </div>
             </div>
             
             <div class="space-y-3 pt-1">
-              @for (exp of formData.experience; track exp.company + exp.period) {
-                <div class="p-3 bg-white border border-slate-200 rounded-lg text-xs shadow-xs space-y-1.5">
-                  <div class="flex items-start justify-between">
-                    <div>
-                      <span class="font-bold text-slate-900 text-xs">{{ exp.role }}</span>
-                      <span class="text-slate-400 font-normal"> at </span>
-                      <span class="text-sky-700 font-bold">{{ exp.company }}</span>
+              @for (exp of formData.experience; track trackByIndex($index); let expIdx = $index) {
+                <div
+                  class="bg-white border rounded-xl shadow-xs overflow-hidden transition-all duration-150"
+                  [ngClass]="isExpExpanded(expIdx) ? 'border-sky-400 ring-2 ring-sky-500/10' : 'border-slate-200 hover:border-slate-300'"
+                >
+                  <!-- Card Header Bar -->
+                  <div class="px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0 cursor-pointer flex-1" (click)="toggleExp(expIdx)">
+                      <span class="text-xs text-slate-400 select-none font-mono">
+                        {{ isExpExpanded(expIdx) ? '▼' : '▶' }}
+                      </span>
+                      <div class="truncate">
+                        <span class="font-bold text-slate-900 text-xs">
+                          {{ exp.role || '(Untitled Job Role)' }}
+                        </span>
+                        <span class="text-slate-400 font-normal"> at </span>
+                        <span class="text-sky-700 font-bold text-xs">
+                          {{ exp.company || '(Company)' }}
+                        </span>
+                        @if (exp.period) {
+                          <span class="text-[11px] text-slate-500 font-medium ml-2">
+                            ({{ exp.period }})
+                          </span>
+                        }
+                      </div>
                     </div>
-                    <span class="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded">{{ exp.period }}</span>
+
+                    <!-- Header Quick Actions -->
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        class="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 rounded hover:bg-slate-200/70 transition-colors"
+                        [disabled]="expIdx === 0"
+                        (click)="moveExperience(expIdx, 'up')"
+                        title="Move role up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        class="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 rounded hover:bg-slate-200/70 transition-colors"
+                        [disabled]="expIdx === formData.experience.length - 1"
+                        (click)="moveExperience(expIdx, 'down')"
+                        title="Move role down"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        class="px-2 py-0.5 text-xs font-semibold rounded border transition-colors cursor-pointer"
+                        [ngClass]="isExpExpanded(expIdx) 
+                          ? 'bg-sky-50 border-sky-300 text-sky-700' 
+                          : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-100'"
+                        (click)="toggleExp(expIdx)"
+                      >
+                        {{ isExpExpanded(expIdx) ? '✓ Done' : '✏️ Edit' }}
+                      </button>
+                      <button
+                        type="button"
+                        class="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                        (click)="removeExperience(expIdx)"
+                        title="Delete this role"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
-                  @if (exp.location) {
-                    <div class="text-[11px] text-slate-400">📍 {{ exp.location }}</div>
+
+                  <!-- Expanded: Full Edit Mode -->
+                  @if (isExpExpanded(expIdx)) {
+                    <div class="p-3.5 space-y-3 bg-white">
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label class="block text-[11px] font-semibold text-slate-700 mb-1">Job Title / Role</label>
+                          <input
+                            type="text"
+                            class="w-full px-2.5 py-1.5 text-xs text-slate-900 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
+                            placeholder="e.g. Lead Enterprise Architect"
+                            [(ngModel)]="exp.role"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-[11px] font-semibold text-slate-700 mb-1">Company / Organization</label>
+                          <input
+                            type="text"
+                            class="w-full px-2.5 py-1.5 text-xs text-slate-900 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
+                            placeholder="e.g. Siemens Healthcare"
+                            [(ngModel)]="exp.company"
+                          />
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label class="block text-[11px] font-semibold text-slate-700 mb-1">Employment Period</label>
+                          <input
+                            type="text"
+                            class="w-full px-2.5 py-1.5 text-xs text-slate-900 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
+                            placeholder="e.g. 2022 – Present"
+                            [(ngModel)]="exp.period"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-[11px] font-semibold text-slate-700 mb-1">Location (Optional)</label>
+                          <input
+                            type="text"
+                            class="w-full px-2.5 py-1.5 text-xs text-slate-900 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
+                            placeholder="e.g. Munich, Germany (Hybrid)"
+                            [(ngModel)]="exp.location"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Strategic Scope / Mandate (Optional for CV & Executive formats)</label>
+                        <input
+                          type="text"
+                          class="w-full px-2.5 py-1.5 text-xs text-slate-900 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
+                          placeholder="e.g. Spearheaded platform architecture across 8 microservices and led a 14-engineer team."
+                          [(ngModel)]="exp.scope"
+                        />
+                      </div>
+
+                      <!-- Achievements / Bullet Points List -->
+                      <div class="pt-2 border-t border-slate-100 space-y-2">
+                        <div class="flex items-center justify-between">
+                          <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                            Verbatim Achievements & Bullet Points ({{ exp.highlights?.length || 0 }})
+                          </label>
+                          <button
+                            type="button"
+                            class="text-[11px] text-sky-600 hover:text-sky-800 font-bold flex items-center gap-1 cursor-pointer"
+                            (click)="addHighlight(expIdx)"
+                          >
+                            <span>+</span>
+                            <span>Add Bullet Point</span>
+                          </button>
+                        </div>
+
+                        <div class="space-y-2">
+                          @for (h of exp.highlights; track trackByIndex($index); let hIdx = $index) {
+                            <div class="flex items-start gap-1.5 group">
+                              <span class="text-slate-400 text-xs font-mono pt-1 select-none w-5 text-right shrink-0">
+                                {{ hIdx + 1 }}.
+                              </span>
+                              <textarea
+                                rows="2"
+                                class="flex-1 p-2 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none resize-y leading-relaxed"
+                                placeholder="Describe key quantified impact, technical architecture, or delivery metric..."
+                                [(ngModel)]="exp.highlights[hIdx]"
+                              ></textarea>
+                              <div class="flex flex-col gap-0.5 shrink-0 pt-0.5">
+                                <button
+                                  type="button"
+                                  class="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 text-[10px] rounded hover:bg-slate-100"
+                                  [disabled]="hIdx === 0"
+                                  (click)="moveHighlight(expIdx, hIdx, 'up')"
+                                  title="Move bullet up"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  type="button"
+                                  class="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 text-[10px] rounded hover:bg-slate-100"
+                                  [disabled]="hIdx === exp.highlights.length - 1"
+                                  (click)="moveHighlight(expIdx, hIdx, 'down')"
+                                  title="Move bullet down"
+                                >
+                                  ▼
+                                </button>
+                                <button
+                                  type="button"
+                                  class="p-1 text-red-400 hover:text-red-700 text-xs rounded hover:bg-red-50"
+                                  (click)="removeHighlight(expIdx, hIdx)"
+                                  title="Delete bullet point"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          }
+                        </div>
+
+                        <button
+                          type="button"
+                          class="w-full py-1.5 text-xs text-sky-700 font-semibold border border-dashed border-sky-300 rounded-lg hover:bg-sky-50 transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+                          (click)="addHighlight(expIdx)"
+                        >
+                          <span>+</span>
+                          <span>Add Another Bullet Point to this Role</span>
+                        </button>
+                      </div>
+                    </div>
+                  } @else {
+                    <!-- Collapsed: Summary Preview Mode -->
+                    <div class="p-3 text-xs cursor-pointer hover:bg-slate-50/50 transition-colors" (click)="toggleExp(expIdx)">
+                      <div class="flex items-start justify-between mb-1">
+                        <div>
+                          <span class="font-bold text-slate-900">{{ exp.role }}</span>
+                          <span class="text-slate-400 font-normal"> at </span>
+                          <span class="text-sky-700 font-bold">{{ exp.company }}</span>
+                        </div>
+                        <span class="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded">{{ exp.period }}</span>
+                      </div>
+                      @if (exp.location) {
+                        <div class="text-[11px] text-slate-400 mb-1.5">📍 {{ exp.location }}</div>
+                      }
+                      <ul class="list-disc list-inside space-y-1 text-slate-600 text-[11.5px]">
+                        @for (h of exp.highlights; track trackByIndex($index)) {
+                          <li class="leading-relaxed">{{ h }}</li>
+                        }
+                      </ul>
+                      <div class="text-[10px] text-sky-600 font-semibold pt-1.5 flex items-center gap-1">
+                        <span>✏️ Click to modify or add bullet points ({{ exp.highlights?.length || 0 }} achievements)</span>
+                      </div>
+                    </div>
                   }
-                  <ul class="list-disc list-inside space-y-1 text-slate-600 text-[11.5px] pt-1">
-                    @for (h of exp.highlights; track h) {
-                      <li class="leading-relaxed">{{ h }}</li>
-                    }
-                  </ul>
+
+                </div>
+              }
+
+              @if (formData.experience.length === 0) {
+                <div class="text-center py-6 bg-white rounded-xl border border-dashed border-slate-300 space-y-2">
+                  <div class="text-2xl">💼</div>
+                  <div class="text-xs font-semibold text-slate-600">No verified experience roles recorded yet.</div>
+                  <button
+                    type="button"
+                    class="px-3 py-1.5 text-xs font-bold rounded-lg bg-sky-600 hover:bg-sky-700 text-white transition-colors"
+                    (click)="addExperience()"
+                  >
+                    + Add Your First Role
+                  </button>
                 </div>
               }
             </div>
           </div>
 
           <!-- Key Projects & Architectural Case Studies -->
-          @if (formData.projects && formData.projects.length > 0) {
-            <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2">
-              <div class="flex items-center justify-between">
+          <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
                 <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Architectural Projects & Case Studies</span>
-                <span class="text-[11px] text-slate-500 font-mono">{{ formData.projects.length }} Projects</span>
+                <span class="text-[11px] text-slate-500 font-mono">{{ formData.projects?.length || 0 }} Projects</span>
               </div>
-              <div class="space-y-2.5 pt-1">
-                @for (p of formData.projects; track p.name) {
-                  <div class="p-3 bg-white border border-slate-200 rounded-lg text-xs space-y-1">
-                    <div class="font-bold text-slate-900 text-xs">{{ p.name }}</div>
-                    <div class="text-[11.5px] text-slate-600 leading-relaxed">{{ p.description }}</div>
-                    @if (p.technologies && p.technologies.length > 0) {
-                      <div class="flex flex-wrap gap-1 pt-1">
-                        @for (tech of p.technologies; track tech) {
-                          <span class="px-1.5 py-0.5 text-[10px] font-mono bg-sky-50 text-sky-700 rounded border border-sky-100">
-                            {{ tech }}
-                          </span>
-                        }
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
+              <button
+                type="button"
+                class="px-2 py-0.5 text-xs font-bold rounded-md bg-sky-600 hover:bg-sky-700 text-white shadow-xs flex items-center gap-1 transition-colors cursor-pointer"
+                (click)="addProject()"
+              >
+                <span>+</span>
+                <span>Add Project</span>
+              </button>
             </div>
-          }
+            <div class="space-y-2.5 pt-1">
+              @for (p of formData.projects; track trackByIndex($index); let pIdx = $index) {
+                <div class="p-3 bg-white border border-slate-200 rounded-lg text-xs space-y-2">
+                  <div class="flex items-start justify-between gap-2">
+                    <input
+                      type="text"
+                      class="flex-1 font-bold text-slate-900 text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 outline-none focus:border-sky-500"
+                      placeholder="Project Name"
+                      [(ngModel)]="p.name"
+                    />
+                    <button
+                      type="button"
+                      class="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                      (click)="removeProject(pIdx)"
+                      title="Delete project"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                  <textarea
+                    rows="2"
+                    class="w-full text-[11.5px] text-slate-700 leading-relaxed bg-slate-50 border border-slate-200 rounded p-2 outline-none focus:border-sky-500 resize-y"
+                    placeholder="Describe architectural challenges, technical patterns, and delivery scope..."
+                    [(ngModel)]="p.description"
+                  ></textarea>
+                </div>
+              }
+            </div>
+          </div>
 
           <!-- Education & Degrees -->
           <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200 space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Education & Credentials</span>
-              <span class="text-[11px] text-slate-500 font-mono">{{ formData.education.length }} Items</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Education & Credentials</span>
+                <span class="text-[11px] text-slate-500 font-mono">{{ formData.education.length }} Items</span>
+              </div>
+              <button
+                type="button"
+                class="px-2 py-0.5 text-xs font-bold rounded-md bg-sky-600 hover:bg-sky-700 text-white shadow-xs flex items-center gap-1 transition-colors cursor-pointer"
+                (click)="addEducation()"
+              >
+                <span>+</span>
+                <span>Add Degree</span>
+              </button>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-              @for (edu of formData.education; track edu.institution + edu.degree) {
-                <div class="p-2.5 bg-white border border-slate-200 rounded-lg text-xs">
-                  <div class="font-bold text-slate-900">{{ edu.degree }}</div>
-                  <div class="text-sky-700 text-[11px]">{{ edu.institution }}</div>
-                  <div class="text-slate-400 text-[10px]">{{ edu.period }}</div>
+              @for (edu of formData.education; track trackByIndex($index); let eduIdx = $index) {
+                <div class="p-2.5 bg-white border border-slate-200 rounded-lg text-xs space-y-1.5 relative group">
+                  <div class="flex items-start justify-between gap-1">
+                    <input
+                      type="text"
+                      class="w-full font-bold text-slate-900 text-xs bg-slate-50 border border-slate-200 rounded px-1.5 py-1 outline-none focus:border-sky-500"
+                      placeholder="Degree / Qualification"
+                      [(ngModel)]="edu.degree"
+                    />
+                    <button
+                      type="button"
+                      class="p-0.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors shrink-0"
+                      (click)="removeEducation(eduIdx)"
+                      title="Delete education entry"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    class="w-full text-sky-700 text-[11px] bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 outline-none focus:border-sky-500"
+                    placeholder="Institution / University"
+                    [(ngModel)]="edu.institution"
+                  />
+                  <input
+                    type="text"
+                    class="w-full text-slate-500 text-[10px] bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 outline-none focus:border-sky-500"
+                    placeholder="Year / Period (e.g. 2016-2018)"
+                    [(ngModel)]="edu.period"
+                  />
                 </div>
               }
             </div>

@@ -25,6 +25,9 @@ export class BaseResumeModalComponent {
   readonly uploadMetadata = signal<any>(null);
   readonly isDragOver = signal<boolean>(false);
 
+  readonly expandedExpIndices = signal<Set<number>>(new Set<number>());
+  private prevIsOpen = false;
+
   formData: ResumeData = {
     name: '',
     title: '',
@@ -41,14 +44,154 @@ export class BaseResumeModalComponent {
   constructor() {
     // Whenever modal opens, sync from active baseResume in service
     effect(() => {
-      if (this.isOpen()) {
+      const open = this.isOpen();
+      if (open && !this.prevIsOpen) {
         const base = this.resumeService.baseResume();
         if (base) {
           this.formData = JSON.parse(JSON.stringify(base));
           this.rawJson = JSON.stringify(base, null, 2);
         }
+        this.expandedExpIndices.set(new Set<number>());
       }
+      this.prevIsOpen = open;
     });
+  }
+
+  isExpExpanded(index: number): boolean {
+    return this.expandedExpIndices().has(index);
+  }
+
+  toggleExp(index: number): void {
+    const current = new Set(this.expandedExpIndices());
+    if (current.has(index)) {
+      current.delete(index);
+    } else {
+      current.add(index);
+    }
+    this.expandedExpIndices.set(current);
+  }
+
+  expandAllExp(): void {
+    const all = new Set<number>();
+    (this.formData.experience || []).forEach((_, i) => all.add(i));
+    this.expandedExpIndices.set(all);
+  }
+
+  collapseAllExp(): void {
+    this.expandedExpIndices.set(new Set<number>());
+  }
+
+  addExperience(): void {
+    if (!this.formData.experience) {
+      this.formData.experience = [];
+    }
+    const newIdx = this.formData.experience.length;
+    this.formData.experience.unshift({
+      role: '',
+      company: '',
+      period: '',
+      location: '',
+      highlights: [''],
+    });
+    const current = new Set(this.expandedExpIndices());
+    // Remap existing expanded indices by +1 since we unshifted to top
+    const updated = new Set<number>();
+    updated.add(0);
+    current.forEach((idx) => updated.add(idx + 1));
+    this.expandedExpIndices.set(updated);
+  }
+
+  removeExperience(index: number): void {
+    if (index >= 0 && index < this.formData.experience.length) {
+      this.formData.experience.splice(index, 1);
+      const current = new Set<number>();
+      this.expandedExpIndices().forEach((i) => {
+        if (i < index) current.add(i);
+        else if (i > index) current.add(i - 1);
+      });
+      this.expandedExpIndices.set(current);
+    }
+  }
+
+  moveExperience(index: number, direction: 'up' | 'down'): void {
+    const exps = this.formData.experience;
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= exps.length) return;
+    const temp = exps[index];
+    exps[index] = exps[targetIdx];
+    exps[targetIdx] = temp;
+    this.swapExpandedIndex(index, targetIdx);
+  }
+
+  private swapExpandedIndex(i1: number, i2: number): void {
+    const current = new Set(this.expandedExpIndices());
+    const has1 = current.has(i1);
+    const has2 = current.has(i2);
+    if (has1) current.add(i2); else current.delete(i2);
+    if (has2) current.add(i1); else current.delete(i1);
+    this.expandedExpIndices.set(current);
+  }
+
+  addHighlight(expIndex: number): void {
+    const exp = this.formData.experience[expIndex];
+    if (exp) {
+      if (!exp.highlights) exp.highlights = [];
+      exp.highlights.push('');
+    }
+  }
+
+  removeHighlight(expIndex: number, hIndex: number): void {
+    const exp = this.formData.experience[expIndex];
+    if (exp && exp.highlights && hIndex >= 0 && hIndex < exp.highlights.length) {
+      exp.highlights.splice(hIndex, 1);
+      if (exp.highlights.length === 0) {
+        exp.highlights.push('');
+      }
+    }
+  }
+
+  moveHighlight(expIndex: number, hIndex: number, direction: 'up' | 'down'): void {
+    const exp = this.formData.experience[expIndex];
+    if (!exp || !exp.highlights) return;
+    const targetIdx = direction === 'up' ? hIndex - 1 : hIndex + 1;
+    if (targetIdx < 0 || targetIdx >= exp.highlights.length) return;
+    const temp = exp.highlights[hIndex];
+    exp.highlights[hIndex] = exp.highlights[targetIdx];
+    exp.highlights[targetIdx] = temp;
+  }
+
+  addProject(): void {
+    if (!this.formData.projects) this.formData.projects = [];
+    this.formData.projects.unshift({
+      name: '',
+      description: '',
+      technologies: [],
+    });
+  }
+
+  removeProject(index: number): void {
+    if (this.formData.projects && index >= 0 && index < this.formData.projects.length) {
+      this.formData.projects.splice(index, 1);
+    }
+  }
+
+  addEducation(): void {
+    if (!this.formData.education) this.formData.education = [];
+    this.formData.education.unshift({
+      degree: '',
+      institution: '',
+      period: '',
+    });
+  }
+
+  removeEducation(index: number): void {
+    if (this.formData.education && index >= 0 && index < this.formData.education.length) {
+      this.formData.education.splice(index, 1);
+    }
+  }
+
+  trackByIndex(index: number): number {
+    return index;
   }
 
   get skillCategories(): string[] {
