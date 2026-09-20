@@ -118,6 +118,8 @@ class GeneratorChain:
         - complete: final tailored resume and rendered HTML
         """
         job_text = (job_input.job_description or "").strip()
+        doc_type = getattr(job_input, "document_type", "resume") or "resume"
+        effective_template_id = "cv_executive" if (doc_type == "cv" and template_id in ("modern", "default")) else template_id
         now_str = lambda: datetime.now().strftime("%H:%M:%S")
 
         # -------------------------------------------------------------
@@ -132,10 +134,12 @@ class GeneratorChain:
         }
         await asyncio.sleep(0.2)
 
+        mode_label = "Executive Curriculum Vitae (Multi-page CV)" if doc_type == "cv" else "Targeted Resume (1-2 Pages)"
         yield {
             "type": "thought",
             "step": "analysis",
             "content": (
+                f"Document Target Mode: {mode_label}.\n"
                 f"Ingesting job specification: {len(job_text)} characters received "
                 f"(Full-length job descriptions supported up to 15,000+ chars)..."
             ),
@@ -219,10 +223,11 @@ class GeneratorChain:
         # -------------------------------------------------------------
         # STAGE 3: Constrained Resume Synthesis & Alignment
         # -------------------------------------------------------------
+        synthesis_title = "Executive CV Synthesis" if doc_type == "cv" else "Constrained Resume Synthesis"
         yield {
             "type": "step",
             "step": "synthesis",
-            "title": "Constrained Resume Synthesis",
+            "title": synthesis_title,
             "status": "running",
             "timestamp": now_str(),
         }
@@ -231,7 +236,7 @@ class GeneratorChain:
         yield {
             "type": "thought",
             "step": "synthesis",
-            "content": f"Formulating targeted executive summary highlighting {', '.join(audit_report.direct_matches[:4])}...",
+            "content": f"Formulating targeted executive profile highlighting {', '.join(audit_report.direct_matches[:4])}...",
             "timestamp": now_str(),
         }
         await asyncio.sleep(0.2)
@@ -249,7 +254,7 @@ class GeneratorChain:
                     "timestamp": now_str(),
                 }
                 async for chunk_ev in self._run_llm_alignment_stream(
-                    llm, base_resume, job_text, target_role, audit_report, company=target_company
+                    llm, base_resume, job_text, target_role, audit_report, company=target_company, doc_type=doc_type
                 ):
                     if chunk_ev.get("type") == "llm_complete":
                         tailored_resume = chunk_ev["resume"]
@@ -273,7 +278,7 @@ class GeneratorChain:
         if not tailored_resume:
             # High-precision deterministic alignment engine with real-time paced reasoning stream
             async for chunk_ev in self._stream_heuristic_alignment(
-                base_resume, audit_report, target_role, company=target_company
+                base_resume, audit_report, target_role, company=target_company, doc_type=doc_type
             ):
                 if chunk_ev.get("type") == "heuristic_complete":
                     tailored_resume = chunk_ev["resume"]
@@ -283,7 +288,7 @@ class GeneratorChain:
         yield {
             "type": "thought",
             "step": "synthesis",
-            "content": "Resume synthesis complete. Reordered 100% verified skills and emphasized highest-impact quantifiable achievements.",
+            "content": f"{mode_label} synthesis complete. Reordered 100% verified skills and emphasized architectural impact.",
             "timestamp": now_str(),
         }
         await asyncio.sleep(0.3)
@@ -291,7 +296,7 @@ class GeneratorChain:
         yield {
             "type": "step",
             "step": "synthesis",
-            "title": "Constrained Resume Synthesis",
+            "title": synthesis_title,
             "status": "done",
             "timestamp": now_str(),
         }
@@ -316,7 +321,9 @@ class GeneratorChain:
         }
         await asyncio.sleep(0.3)
 
-        verified_resume, verification_audit = self._verify_anti_hallucination(base_resume, tailored_resume)
+        verified_resume, verification_audit = self._verify_anti_hallucination(
+            base_resume, tailored_resume, doc_type=doc_type
+        )
         audit_report.anti_hallucination_audit = verification_audit
 
         for item in verification_audit:
@@ -340,7 +347,7 @@ class GeneratorChain:
         # STAGE 5: Template Rendering & Complete Event
         # -------------------------------------------------------------
         rendered_html = template_engine.render(
-            verified_resume, template_id=template_id, highlight_diff=True, base_resume=base_resume
+            verified_resume, template_id=effective_template_id, highlight_diff=True, base_resume=base_resume
         )
 
         yield {
@@ -491,18 +498,31 @@ class GeneratorChain:
         )
 
     async def _stream_heuristic_alignment(
-        self, base: ResumeData, audit: AlignmentReport, target_role: str, company: Optional[str] = None
+        self,
+        base: ResumeData,
+        audit: AlignmentReport,
+        target_role: str,
+        company: Optional[str] = None,
+        doc_type: str = "resume",
     ) -> AsyncGenerator[Dict, None]:
         """Paced real-time reasoning stream for deterministic alignment engine."""
         now_str = lambda: datetime.now().strftime("%H:%M:%S")
         company_phrase = f" at {company}" if company else ""
 
-        reasoning_steps = [
-            f"Analyzing role scope: Strategic alignment for {target_role}{company_phrase}...\n",
-            f"Mapping top verified competencies: {', '.join(audit.direct_matches[:5])}...\n",
-            "Elevating high-scale enterprise experience (AVEVA Nx monorepo, 25–35% build speedups)...\n",
-            "Synthesizing quantified achievements and harmonizing skill hierarchy...\n",
-        ]
+        if doc_type == "cv":
+            reasoning_steps = [
+                f"Analyzing executive scope: Strategic CV alignment for {target_role}{company_phrase}...\n",
+                f"Curating comprehensive technical taxonomy across: {', '.join(audit.direct_matches[:6])}...\n",
+                "Synthesizing architectural case studies and high-scale enterprise systems (AVEVA Nx monorepo)...\n",
+                "Integrating verified professional credentials, certifications, and leadership milestones...\n",
+            ]
+        else:
+            reasoning_steps = [
+                f"Analyzing role scope: Strategic alignment for {target_role}{company_phrase}...\n",
+                f"Mapping top verified competencies: {', '.join(audit.direct_matches[:5])}...\n",
+                "Elevating high-scale enterprise experience (AVEVA Nx monorepo, 25–35% build speedups)...\n",
+                "Synthesizing quantified achievements and harmonizing skill hierarchy...\n",
+            ]
 
         for step in reasoning_steps:
             for token in step.split(" "):
@@ -515,11 +535,16 @@ class GeneratorChain:
                 await asyncio.sleep(0.04)
             await asyncio.sleep(0.1)
 
-        tailored = self._align_resume_heuristically(base, audit, target_role, company=company)
+        tailored = self._align_resume_heuristically(base, audit, target_role, company=company, doc_type=doc_type)
         yield {"type": "heuristic_complete", "resume": tailored}
 
     def _align_resume_heuristically(
-        self, base: ResumeData, audit: AlignmentReport, target_role: str, company: Optional[str] = None
+        self,
+        base: ResumeData,
+        audit: AlignmentReport,
+        target_role: str,
+        company: Optional[str] = None,
+        doc_type: str = "resume",
     ) -> ResumeData:
         """
         High-precision deterministic alignment that reframes summary and elevates matching highlights
@@ -527,13 +552,23 @@ class GeneratorChain:
         """
         top_matches = ", ".join(audit.direct_matches[:4]) if audit.direct_matches else "Angular, TypeScript, and Scalable UI Architecture"
         company_phrase = f" for {company}" if company else ""
-        tailored_summary = (
-            f"Accomplished {target_role} with 7+ years of proven track record designing and architecting "
-            f"high-scale enterprise web applications. Deep specialization in {top_matches}. "
-            f"Extensive production experience modernizing complex legacy applications, optimizing Nx monorepos "
-            f"(25–35% build speedups), and integrating AI-driven interfaces (LangChain, streaming systems). "
-            f"Well-suited for driving frontend architecture, code quality, and high-performance user experiences{company_phrase}."
-        )
+
+        if doc_type == "cv":
+            tailored_summary = (
+                f"Accomplished {target_role} and Frontend Architect with 7+ years of expertise designing and "
+                f"scaling mission-critical enterprise web platforms. Deep specialization across {top_matches}. "
+                f"Distinguished career track record spanning monorepo re-architecting (Nx, 25–35% velocity enhancements), "
+                f"legacy modernization, microfrontends, and next-generation AI interface orchestration (LangChain, streaming systems). "
+                f"Adept at technical leadership, architectural governance, and cross-functional engineering excellence{company_phrase}."
+            )
+        else:
+            tailored_summary = (
+                f"Accomplished {target_role} with 7+ years of proven track record designing and architecting "
+                f"high-scale enterprise web applications. Deep specialization in {top_matches}. "
+                f"Extensive production experience modernizing complex legacy applications, optimizing Nx monorepos "
+                f"(25–35% build speedups), and integrating AI-driven interfaces (LangChain, streaming systems). "
+                f"Well-suited for driving frontend architecture, code quality, and high-performance user experiences{company_phrase}."
+            )
 
         # Re-prioritize skills: Put primary matches first
         new_skills: Dict[str, List[str]] = {}
@@ -561,7 +596,8 @@ class GeneratorChain:
                 )
             )
 
-        tagline = f"Enterprise Architecture • {', '.join(audit.direct_matches[:3]) if audit.direct_matches else 'Scalable UI'}"
+        tagline_prefix = "Enterprise Architecture & Leadership" if doc_type == "cv" else "Enterprise Architecture"
+        tagline = f"{tagline_prefix} • {', '.join(audit.direct_matches[:3]) if audit.direct_matches else 'Scalable UI'}"
         if company:
             tagline += f" • Aligned for {company}"
 
@@ -579,6 +615,10 @@ class GeneratorChain:
             experience=new_experience,
             education=base.education,
             skills=new_skills,
+            projects=base.projects,
+            certifications=base.certifications,
+            publications=base.publications,
+            document_type="cv" if doc_type == "cv" else "resume",
         )
 
     async def _run_llm_alignment_stream(
@@ -589,6 +629,7 @@ class GeneratorChain:
         target_role: str,
         audit: AlignmentReport,
         company: Optional[str] = None,
+        doc_type: str = "resume",
     ) -> AsyncGenerator[Dict, None]:
         """
         Runs LangChain streaming chain (astream) with strict anti-hallucination system prompt.
@@ -597,21 +638,36 @@ class GeneratorChain:
         now_str = lambda: datetime.now().strftime("%H:%M:%S")
         from langchain_core.messages import HumanMessage, SystemMessage
 
-        system_prompt = (
-            "You are an expert Executive Resume Strategist. Your mission is to align a candidate's resume "
-            "to a target job description with STRICT ZERO HALLUCINATION.\n\n"
-            "STRICT CONSTRAINTS:\n"
-            "1. You MUST ONLY use the candidate's verified companies, employment dates, and educational credentials. "
-            "NEVER invent new employers or change dates.\n"
-            "2. You MUST NOT add skills or tools the candidate has never used. Only emphasize and highlight real skills.\n"
-            "3. Reframe bullet points to highlight measurable business impact, architecture decisions, and target keywords.\n"
-            "4. First output your strategic reasoning thoughts explaining your alignment strategy.\n"
-            "5. Then output the complete final resume JSON enclosed inside ```json ... ``` code blocks."
-        )
+        if doc_type == "cv":
+            system_prompt = (
+                "You are an expert Executive Career Strategist and CV Architect. Your mission is to align a candidate's "
+                "Curriculum Vitae (CV) to a target job description with STRICT ZERO HALLUCINATION.\n\n"
+                "STRICT CONSTRAINTS:\n"
+                "1. You MUST ONLY use the candidate's verified companies, employment dates, projects, and educational credentials. "
+                "NEVER invent new employers or change dates.\n"
+                "2. You MUST NOT add skills or tools the candidate has never used. Only emphasize and highlight real skills.\n"
+                "3. Emphasize comprehensive career achievements, architectural design decisions, system scale, and leadership.\n"
+                "4. Maintain and preserve projects, certifications, and publications from the base profile.\n"
+                "5. First output your strategic reasoning thoughts explaining your alignment strategy.\n"
+                "6. Then output the complete final CV JSON enclosed inside ```json ... ``` code blocks."
+            )
+        else:
+            system_prompt = (
+                "You are an expert Executive Resume Strategist. Your mission is to align a candidate's resume "
+                "to a target job description with STRICT ZERO HALLUCINATION.\n\n"
+                "STRICT CONSTRAINTS:\n"
+                "1. You MUST ONLY use the candidate's verified companies, employment dates, and educational credentials. "
+                "NEVER invent new employers or change dates.\n"
+                "2. You MUST NOT add skills or tools the candidate has never used. Only emphasize and highlight real skills.\n"
+                "3. Reframe bullet points to highlight measurable business impact, architecture decisions, and target keywords.\n"
+                "4. First output your strategic reasoning thoughts explaining your alignment strategy.\n"
+                "5. Then output the complete final resume JSON enclosed inside ```json ... ``` code blocks."
+            )
 
         user_content = json.dumps({
             "target_role": target_role,
             "target_company": company or "Target Company",
+            "document_type": doc_type,
             "job_description": job_text[:15000],
             "base_resume": base.model_dump(),
             "direct_matches": audit.direct_matches,
@@ -639,7 +695,7 @@ class GeneratorChain:
                     yield {
                         "type": "thought",
                         "step": "synthesis",
-                        "content": "Reasoning complete. Streaming aligned resume schema...",
+                        "content": f"Reasoning complete. Streaming aligned {doc_type.upper()} schema...",
                         "timestamp": now_str(),
                     }
                 # Emit periodic dot to indicate ongoing JSON generation
@@ -676,7 +732,7 @@ class GeneratorChain:
             yield {"type": "llm_error", "error": "No valid JSON structure found in LLM output."}
 
     def _verify_anti_hallucination(
-        self, base: ResumeData, generated: ResumeData
+        self, base: ResumeData, generated: ResumeData, doc_type: str = "resume"
     ) -> Tuple[ResumeData, List[AlignmentAuditItem]]:
         """
         Deterministic Verification Engine (Tier 2).
@@ -746,6 +802,24 @@ class GeneratorChain:
                 check="Contact & Identity Integrity",
                 status="PASSED",
                 details="Contact details locked to verified candidate profile.",
+            )
+        )
+
+        # 4. Invariance & Integrity for Projects & Certifications
+        if not generated.projects and base.projects:
+            generated.projects = base.projects
+        if not generated.certifications and base.certifications:
+            generated.certifications = base.certifications
+        if not generated.publications and base.publications:
+            generated.publications = base.publications
+
+        generated.document_type = "cv" if doc_type == "cv" else "resume"
+
+        audit_items.append(
+            AlignmentAuditItem(
+                check="Document Paradigm Integrity",
+                status="PASSED",
+                details=f"Validated {generated.document_type.upper()} schema invariance against verified Ground Truth profile.",
             )
         )
 

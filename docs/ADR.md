@@ -197,3 +197,46 @@ Users require the ability to upload their existing resume (PDF, Word DOCX, Plain
 - **Positive**: Effortless onboarding: users can upload their real PDF/DOCX resume in seconds.
 - **Positive**: Zero data loss or hallucination: extracted data is presented for user review.
 - **Positive**: 100% functional offline or online.
+
+---
+
+## ADR-008: Dual Document Generation Paradigm (Targeted Resume vs. Custom Curriculum Vitae)
+
+### Status
+Accepted
+
+### Context
+Senior software architects and engineering leaders require two distinct presentation formats depending on the target role, geography, and hiring stage:
+1. **Targeted Resume (1–2 Pages)**: Highly condensed, high ATS keyword density, emphasizing recent high-impact quantifiable metrics and direct role requirements.
+2. **Custom Curriculum Vitae (Multi-Page CV)**: Comprehensive career biography detailing architectural decisions, enterprise scale, technical leadership, legacy modernization case studies, professional certifications, and complete technical taxonomy.
+
+Attempting to force both formats into a single template created a design tension: either the resume overflowed onto an awkward half-page, or architectural case studies and certifications had to be omitted.
+
+### Decision
+1. **Unified Schema Extension**:
+   - Expanded `ResumeData`, `ProjectItem`, `CertificationItem`, and `JobInput` to include `projects`, `certifications`, `publications`, and `document_type` (`"resume"` | `"cv"`).
+2. **Dedicated Executive CV Template (`cv_executive`)**:
+   - Designed a comprehensive multi-page layout featuring:
+     - Executive Career Architecture & Profile summary
+     - Full technical taxonomy and core competency matrix
+     - Career history with verified quantifiable impact
+     - Key Architectural Projects & Case Studies (role, dates, system description, technology badges, live repository links)
+     - Professional Certifications & Licenses (issuer, date, credential ID, URL)
+     - Publications & Thought Leadership
+     - Education & Academic Background
+3. **Print & Page Break Architecture**:
+   - Integrated CSS print specifications (`page-break-inside: avoid;`, `break-inside: avoid;`, `@page { margin: 15mm; size: A4 portrait; }`) ensuring clean page boundaries when exporting to PDF via browser print engines.
+4. **Adaptive Alignment Pipeline**:
+   - In `GeneratorChain`, when `document_type == 'cv'`:
+     - Synthesis prompts reframe the executive profile around technical governance, mentorship pipelines, and architectural vision.
+     - Auto-selects `cv_executive` template if default is requested.
+     - Tier-2 Deterministic Anti-Hallucination verification strictly validates that projects and certifications originate solely from the candidate's verified Ground Truth profile.
+5. **Frontend User Controls**:
+   - Added responsive document mode switcher in the Job Input component (`📄 Targeted Resume` vs. `📜 Custom CV`).
+   - Dynamic UI styling, button labels, and export filenames (`[Name]_Custom_CV.pdf`, `.html`, `.json`).
+
+### Consequences
+- **Positive**: High-utility dual document generation covering both rapid ATS screeners and comprehensive executive hiring evaluations.
+- **Positive**: Pixel-perfect multi-page PDF exports with zero card-splitting across page breaks.
+- **Positive**: Strict preservation of Ground Truth integrity across both formats.
+

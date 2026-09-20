@@ -24,10 +24,16 @@ export class JobInputComponent {
   targetTitle = '';
 
   readonly isStreaming = this.resumeService.isStreaming;
+  readonly documentMode = this.resumeService.documentMode;
+
+  setDocumentMode(mode: 'resume' | 'cv'): void {
+    this.resumeService.setDocumentMode(mode);
+  }
 
   canGenerate(): boolean {
     return Boolean((this.jobDescription && this.jobDescription.trim().length > 30) || this.linkedinUrl);
   }
+
 
   async onExtractLinkedIn(): Promise<void> {
     if (!this.linkedinUrl) return;
@@ -74,6 +80,8 @@ Key Qualifications:
       job_description: this.jobDescription,
       linkedin_url: this.linkedinUrl,
       target_title: this.targetTitle || undefined,
+      document_type: this.documentMode(),
     });
   }
+
 }

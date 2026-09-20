@@ -27,6 +27,24 @@ class EducationItem(BaseModel):
     period: str
 
 
+class ProjectItem(BaseModel):
+    name: str
+    description: str
+    technologies: List[str] = Field(default_factory=list)
+    role: Optional[str] = None
+    period: Optional[str] = None
+    url: Optional[str] = None
+
+
+class CertificationItem(BaseModel):
+    name: str
+    issuer: str
+    year: Optional[str] = None
+    date: Optional[str] = None
+    credential_id: Optional[str] = None
+    url: Optional[str] = None
+
+
 class ResumeData(BaseModel):
     name: str
     title: str
@@ -41,12 +59,17 @@ class ResumeData(BaseModel):
     experience: List[ExperienceItem] = Field(default_factory=list)
     education: List[EducationItem] = Field(default_factory=list)
     skills: Dict[str, List[str]] = Field(default_factory=dict)
+    projects: List[ProjectItem] = Field(default_factory=list)
+    certifications: List[CertificationItem] = Field(default_factory=list)
+    publications: List[str] = Field(default_factory=list)
+    document_type: Literal["resume", "cv"] = "resume"
 
 
 class JobInput(BaseModel):
     job_description: Optional[str] = None
     linkedin_url: Optional[str] = None
     target_title: Optional[str] = None
+    document_type: Literal["resume", "cv"] = "resume"
 
 
 class LLMConfig(BaseModel):

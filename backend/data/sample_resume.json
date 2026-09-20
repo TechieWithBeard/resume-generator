@@ -65,5 +65,28 @@
     "backendSystems": ["Python", "FastAPI", "Node.js", "REST APIs", "GraphQL", "Kafka", "PostgreSQL", "Redis"],
     "cloudDevOps": ["Docker", "Kubernetes", "AWS", "CI/CD Pipelines", "Terraform", "Git"],
     "aiWorkflows": ["LangChain", "Streaming UIs", "RAG Pipelines", "Prompt Engineering", "OpenAI API", "Ollama"]
-  }
+  },
+  "projects": [
+    {
+      "name": "CloudScale Microfrontend Infrastructure",
+      "role": "Principal Architect",
+      "period": "2023 – 2024",
+      "description": "Engineered federated microfrontend architecture handling millions of daily requests with sub-second page transitions.",
+      "technologies": ["Angular", "TypeScript", "Microfrontends", "AWS", "Docker"],
+      "url": "https://github.com/alex-mercer-example"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "AWS Certified Solutions Architect – Professional",
+      "issuer": "Amazon Web Services",
+      "year": "2023",
+      "credential_id": "AWS-PSA-49102"
+    }
+  ],
+  "publications": [
+    "Architecting Zero-Latency Streaming Applications with Python and Modern Web (2023)"
+  ],
+  "document_type": "resume"
 }
+

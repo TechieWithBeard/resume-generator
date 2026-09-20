@@ -131,6 +131,84 @@ class TestResumeGenerator(unittest.TestCase):
         url2 = "https://www.linkedin.com/jobs/collections/recommended/?currentJobId=3981726354"
         self.assertEqual(linkedin_extractor.extract_job_id(url2), "3981726354")
 
+    def test_cv_executive_template_rendering(self):
+        """Verifies cv_executive template renders projects, certs, publications, and page break rules."""
+        from backend.app.models.resume import ProjectItem, CertificationItem
+        cv_resume = self.sample_base.model_copy(deep=True)
+        cv_resume.document_type = "cv"
+        cv_resume.projects = [
+            ProjectItem(
+                name="Enterprise Monorepo Modernization",
+                role="Lead Architect",
+                period="2023 – 2024",
+                description="Engineered microfrontend architecture for global logistics.",
+                technologies=["Angular", "Nx", "RxJS"],
+                url="https://example.com/project",
+            )
+        ]
+        cv_resume.certifications = [
+            CertificationItem(
+                name="AWS Certified Solutions Architect",
+                issuer="Amazon Web Services",
+                year="2023",
+                credential_id="AWS-12345",
+            )
+        ]
+        cv_resume.publications = ["High-Scale UI Architecture in Modern Enterprise Web (2024)"]
+
+        html = template_engine.render(cv_resume, template_id="cv_executive")
+        self.assertIn("Curriculum Vitae", html)
+        self.assertIn("Enterprise Monorepo Modernization", html)
+        self.assertIn("Lead Architect", html)
+        self.assertIn("AWS Certified Solutions Architect", html)
+        self.assertIn("AWS-12345", html)
+        self.assertIn("High-Scale UI Architecture in Modern Enterprise Web", html)
+        self.assertIn("avoid-break", html)
+        self.assertIn("@media print", html)
+
+    def test_cv_generator_stream_and_alignment(self):
+        """Verifies generator stream produces aligned CV with projects, certs, and cv_executive template."""
+        from backend.app.models.resume import ProjectItem, CertificationItem
+        cv_resume = self.sample_base.model_copy(deep=True)
+        cv_resume.projects = [
+            ProjectItem(
+                name="Mission-Critical Monorepo",
+                description="Large scale industrial SaaS platform",
+                technologies=["Angular", "TypeScript"],
+            )
+        ]
+        cv_resume.certifications = [
+            CertificationItem(
+                name="Angular Enterprise Architect",
+                issuer="Angular Institute",
+                year="2023",
+            )
+        ]
+
+        async def run_cv_stream():
+            job_in = JobInput(
+                job_description="Seeking a Principal Frontend Architect to direct engineering and architecture.",
+                target_title="Principal Frontend Architect",
+                document_type="cv",
+            )
+            cfg = LLMConfig(provider="heuristic")
+            events = []
+            async for ev in generator_chain.generate_stream(job_in, cv_resume, cfg):
+                events.append(ev)
+            return events
+
+        events = asyncio.run(run_cv_stream())
+        complete_event = next(e for e in events if e["type"] == "complete")
+        gen_data = complete_event["resume"]
+        gen_html = complete_event["html"]
+
+        self.assertEqual(gen_data["document_type"], "cv")
+        self.assertTrue(len(gen_data["projects"]) > 0)
+        self.assertTrue(len(gen_data["certifications"]) > 0)
+        self.assertIn("Curriculum Vitae", gen_html)
+        self.assertIn("Mission-Critical Monorepo", gen_html)
+
 
 if __name__ == "__main__":
     unittest.main()
+

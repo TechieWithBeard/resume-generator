@@ -19,8 +19,10 @@ export class ResumePreviewComponent {
   readonly templates = this.resumeService.availableTemplates;
   readonly selectedTemplate = this.resumeService.selectedTemplate;
   readonly comparisonMode = this.resumeService.comparisonMode;
+  readonly documentMode = this.resumeService.documentMode;
 
   onSelectTemplate(tmplId: string): void {
+
     this.resumeService.selectTemplate(tmplId);
   }
 

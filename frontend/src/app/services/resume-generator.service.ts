@@ -31,8 +31,10 @@ export class ResumeGeneratorService {
     { id: 'modern', name: 'Modern Tech', description: 'Clean, accent styling, skill badges', is_default: true },
     { id: 'executive', name: 'Executive Minimalist', description: 'High-contrast classic ATS layout', is_default: false },
     { id: 'compact', name: 'Compact Classic', description: 'Space-efficient engineering layout', is_default: false },
+    { id: 'cv_executive', name: 'Executive CV', description: 'Multi-page comprehensive CV with projects & certs', is_default: false },
   ]);
   readonly selectedTemplate = signal<string>('modern');
+  readonly documentMode = signal<'resume' | 'cv'>('resume');
   readonly comparisonMode = signal<boolean>(false);
 
   readonly llmConfig = signal<LLMConfig>({
@@ -45,6 +47,7 @@ export class ResumeGeneratorService {
   // UI Dialog Controls
   readonly showBaseResumeModal = signal<boolean>(false);
   readonly showSettingsDrawer = signal<boolean>(false);
+
 
   constructor() {
     this.init();
@@ -196,6 +199,19 @@ export class ResumeGeneratorService {
     }
   }
 
+  async setDocumentMode(mode: 'resume' | 'cv'): Promise<void> {
+    this.documentMode.set(mode);
+    if (mode === 'cv' && this.selectedTemplate() === 'modern') {
+      this.selectedTemplate.set('cv_executive');
+    } else if (mode === 'resume' && this.selectedTemplate() === 'cv_executive') {
+      this.selectedTemplate.set('modern');
+    }
+    const active = this.activeResume();
+    if (active) {
+      await this.renderResume(active, this.selectedTemplate(), this.comparisonMode());
+    }
+  }
+
   async toggleComparisonMode(): Promise<void> {
     const newMode = !this.comparisonMode();
     this.comparisonMode.set(newMode);
@@ -229,12 +245,22 @@ export class ResumeGeneratorService {
     this.activeStreamingText.set('');
     this.currentStep.set('analysis');
 
+    const enrichedInput: JobInput = {
+      ...jobInput,
+      document_type: jobInput.document_type || this.documentMode(),
+    };
+
+    if (this.documentMode() === 'cv' && this.selectedTemplate() === 'modern') {
+      this.selectedTemplate.set('cv_executive');
+    }
+
     const payload = {
-      job_input: jobInput,
+      job_input: enrichedInput,
       llm_config: this.llmConfig(),
       base_resume: this.baseResume(),
       template_id: this.selectedTemplate(),
     };
+
 
     try {
       const response = await fetch(`${this.API_BASE}/api/generate/stream`, {
@@ -370,8 +396,9 @@ export class ResumeGeneratorService {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const name = this.activeResume()?.name?.replace(/\s+/g, '_') || 'Resume';
-    a.download = `${name}_Tailored_Resume.html`;
+    const name = this.activeResume()?.name?.replace(/\s+/g, '_') || 'Profile';
+    const docSuffix = this.documentMode() === 'cv' ? 'Custom_CV' : 'Tailored_Resume';
+    a.download = `${name}_${docSuffix}.html`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -384,9 +411,11 @@ export class ResumeGeneratorService {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const name = resume.name?.replace(/\s+/g, '_') || 'Resume';
-    a.download = `${name}_Tailored_Resume.json`;
+    const name = resume.name?.replace(/\s+/g, '_') || 'Profile';
+    const docSuffix = this.documentMode() === 'cv' ? 'Custom_CV' : 'Tailored_Resume';
+    a.download = `${name}_${docSuffix}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
+
 }

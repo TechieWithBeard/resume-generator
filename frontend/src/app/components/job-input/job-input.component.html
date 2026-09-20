@@ -21,7 +21,42 @@
 
   <!-- Card Body -->
   <div class="p-5 space-y-4">
+    <!-- Document Paradigm Switcher: Targeted Resume vs Custom CV -->
+    <div class="space-y-1.5">
+      <div class="flex items-center justify-between">
+        <label class="block text-xs font-semibold text-slate-700">Document Type</label>
+        <span class="text-[10px] text-slate-500 font-medium">
+          {{ documentMode() === 'cv' ? 'Comprehensive multi-page profile with projects & certs' : 'Condensed 1–2 page ATS profile' }}
+        </span>
+      </div>
+      <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100/90 rounded-xl border border-slate-200">
+        <button
+          type="button"
+          class="py-2 px-3 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all duration-150"
+          [ngClass]="documentMode() === 'resume' ? 'bg-white text-sky-700 shadow-sm font-bold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'"
+          (click)="setDocumentMode('resume')"
+          [disabled]="isStreaming()"
+        >
+          <span>📄</span>
+          <span>Targeted Resume</span>
+          <span class="text-[9px] py-0.5 px-1.5 rounded font-normal" [ngClass]="documentMode() === 'resume' ? 'bg-sky-50 text-sky-600' : 'bg-slate-200/70 text-slate-500'">1–2 p</span>
+        </button>
+        <button
+          type="button"
+          class="py-2 px-3 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all duration-150"
+          [ngClass]="documentMode() === 'cv' ? 'bg-white text-indigo-700 shadow-sm font-bold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'"
+          (click)="setDocumentMode('cv')"
+          [disabled]="isStreaming()"
+        >
+          <span>📜</span>
+          <span>Custom CV</span>
+          <span class="text-[9px] py-0.5 px-1.5 rounded font-semibold" [ngClass]="documentMode() === 'cv' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-200/70 text-slate-500'">Multi-p</span>
+        </button>
+      </div>
+    </div>
+
     <!-- LinkedIn URL Input Section -->
+
     @if (activeTab() === 'linkedin') {
       <div class="space-y-1.5 animate-fadeIn">
         <label for="linkedinUrl" class="block text-xs font-semibold text-slate-700">
@@ -112,13 +147,16 @@
     <!-- Primary Action Button -->
     <button
       type="button"
-      class="w-full py-3 px-4 rounded-xl text-xs sm:text-sm font-bold text-white shadow-md shadow-sky-600/25 bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-500 hover:to-sky-600 active:scale-[0.99] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+      class="w-full py-3 px-4 rounded-xl text-xs sm:text-sm font-bold text-white shadow-md active:scale-[0.99] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+      [ngClass]="documentMode() === 'cv' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 shadow-indigo-600/25' : 'bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-500 hover:to-sky-600 shadow-sky-600/25'"
       (click)="onGenerate()"
       [disabled]="!canGenerate() || isStreaming()"
     >
       @if (isStreaming()) {
         <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
         <span>Streaming Real-Time AI Decisions...</span>
+      } @else if (documentMode() === 'cv') {
+        <span>📜 Generate Custom Curriculum Vitae (CV)</span>
       } @else {
         <span>✨ Generate Tailored ATS Resume</span>
       }

@@ -18,6 +18,24 @@ export interface EducationItem {
   period: string;
 }
 
+export interface ProjectItem {
+  name: string;
+  description: string;
+  technologies?: string[];
+  role?: string;
+  period?: string;
+  url?: string;
+}
+
+export interface CertificationItem {
+  name: string;
+  issuer: string;
+  year?: string;
+  date?: string;
+  credential_id?: string;
+  url?: string;
+}
+
 export interface ResumeData {
   name: string;
   title: string;
@@ -32,13 +50,19 @@ export interface ResumeData {
   experience: ExperienceItem[];
   education: EducationItem[];
   skills: Record<string, string[]>;
+  projects?: ProjectItem[];
+  certifications?: CertificationItem[];
+  publications?: string[];
+  document_type?: 'resume' | 'cv';
 }
 
 export interface JobInput {
   job_description?: string;
   linkedin_url?: string;
   target_title?: string;
+  document_type?: 'resume' | 'cv';
 }
+
 
 export interface LLMConfig {
   provider: 'auto' | 'ollama' | 'openai' | 'huggingface' | 'heuristic';

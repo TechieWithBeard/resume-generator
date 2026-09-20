@@ -7,6 +7,7 @@ Includes:
 Embedded print styles ensure pixel-perfect PDF export via browser print engine.
 """
 
+import re
 from typing import Any, Dict, List, Optional
 from backend.app.models.resume import ResumeData
 
@@ -31,6 +32,12 @@ class TemplateEngine:
             "description": "Space-efficient single/two-page dense layout ideal for engineering depth.",
             "is_default": False,
         },
+        {
+            "id": "cv_executive",
+            "name": "Executive Curriculum Vitae (CV)",
+            "description": "Comprehensive multi-page CV layout featuring architectural project case studies, leadership highlights, and certifications.",
+            "is_default": False,
+        },
     ]
 
     def list_templates(self) -> List[Dict[str, Any]]:
@@ -43,8 +50,11 @@ class TemplateEngine:
         highlight_diff: bool = False,
         base_resume: Optional[ResumeData] = None,
     ) -> str:
-        """Renders the resume data into a standalone, printable HTML document."""
-        if template_id == "executive":
+        """Renders the resume or CV data into a standalone, printable HTML document."""
+        doc_type = getattr(resume, "document_type", "resume")
+        if template_id == "cv_executive" or (doc_type == "cv" and template_id in ("modern", "default")):
+            return self._render_cv_executive(resume, highlight_diff, base_resume)
+        elif template_id == "executive":
             return self._render_executive(resume, highlight_diff, base_resume)
         elif template_id == "compact":
             return self._render_compact(resume, highlight_diff, base_resume)
@@ -449,6 +459,431 @@ class TemplateEngine:
 </html>
 """
 
+    def _render_cv_executive(
+        self,
+        resume: ResumeData,
+        highlight_diff: bool = False,
+        base_resume: Optional[ResumeData] = None,
+    ) -> str:
+        base_highlights = set()
+        if highlight_diff and base_resume:
+            for exp in base_resume.experience:
+                for h in exp.highlights:
+                    base_highlights.add(h.strip().lower())
+
+        contacts = []
+        if resume.email:
+            contacts.append(f'<span class="contact-item">✉ {resume.email}</span>')
+        if resume.phone:
+            contacts.append(f'<span class="contact-item">☎ {resume.phone}</span>')
+        if resume.location:
+            contacts.append(f'<span class="contact-item">📍 {resume.location}</span>')
+        if resume.linkedin:
+            contacts.append(f'<a href="{resume.linkedin}" target="_blank" class="contact-item">🔗 LinkedIn</a>')
+        if resume.github:
+            contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item">💻 GitHub</a>')
+        contact_html = " &bull; ".join(contacts)
+
+        # Experience entries
+        exp_html = ""
+        for exp in resume.experience:
+            bullets = ""
+            for h in exp.highlights:
+                is_modified = highlight_diff and (h.strip().lower() not in base_highlights)
+                highlight_cls = "highlighted-bullet" if is_modified else ""
+                bullets += f'<li class="{highlight_cls}">{h}</li>\n'
+
+            loc_str = f'<span class="exp-location">{exp.location}</span>' if exp.location else ""
+            exp_html += f"""
+            <div class="cv-entry avoid-break">
+                <div class="entry-header">
+                    <div>
+                        <span class="entry-title">{exp.role}</span>
+                        <span class="entry-sep">|</span>
+                        <span class="entry-subtitle">{exp.company}</span>
+                    </div>
+                    <div class="entry-meta">
+                        <span class="entry-period">{exp.period}</span>
+                        {loc_str}
+                    </div>
+                </div>
+                <ul class="entry-bullets">
+                    {bullets}
+                </ul>
+            </div>
+            """
+
+        # Skills categories
+        skills_html = ""
+        for cat_name, skill_list in resume.skills.items():
+            formatted_cat = cat_name.replace("_", " ").title()
+            items_str = ", ".join(skill_list)
+            skills_html += f"""
+            <div class="skill-row avoid-break">
+                <span class="skill-cat">{formatted_cat}:</span>
+                <span class="skill-items">{items_str}</span>
+            </div>
+            """
+
+        # Education entries
+        edu_html = ""
+        for edu in resume.education:
+            edu_html += f"""
+            <div class="cv-entry avoid-break">
+                <div class="entry-header">
+                    <div>
+                        <span class="entry-title">{edu.degree}</span>
+                        <span class="entry-sep">|</span>
+                        <span class="entry-subtitle">{edu.institution}</span>
+                    </div>
+                    <div class="entry-meta">
+                        <span class="entry-period">{edu.period}</span>
+                    </div>
+                </div>
+            </div>
+            """
+
+        # Projects section (Case Studies / Key Architectural Deliverables)
+        projects_html = ""
+        projects = getattr(resume, "projects", None) or []
+        if projects:
+            p_items = ""
+            for p in projects:
+                p_role = f'<span class="entry-subtitle">({p.role})</span>' if p.role else ""
+                p_period = f'<span class="entry-period">{p.period}</span>' if p.period else ""
+                p_techs = ""
+                if p.technologies:
+                    p_badges = "".join([f'<span class="tech-badge">{t}</span>' for t in p.technologies])
+                    p_techs = f'<div class="tech-stack">{p_badges}</div>'
+                
+                url_link = f' <a href="{p.url}" target="_blank" class="entry-link">↗ Link</a>' if p.url else ""
+                p_items += f"""
+                <div class="cv-project-card avoid-break">
+                    <div class="entry-header">
+                        <div>
+                            <span class="entry-title">{p.name}</span>
+                            {p_role}
+                            {url_link}
+                        </div>
+                        {p_period}
+                    </div>
+                    <p class="project-desc">{p.description}</p>
+                    {p_techs}
+                </div>
+                """
+            projects_html = f"""
+            <div class="cv-section">
+                <div class="section-title">Key Architectural Projects & Case Studies</div>
+                {p_items}
+            </div>
+            """
+
+        # Certifications section
+        certs_html = ""
+        certifications = getattr(resume, "certifications", None) or []
+        if certifications:
+            c_items = ""
+            for c in certifications:
+                c_issuer = f'<span class="entry-subtitle">{c.issuer}</span>' if c.issuer else ""
+                c_period_val = c.date or c.year
+                c_date = f'<span class="entry-period">{c_period_val}</span>' if c_period_val else ""
+                c_cred = f'<span class="cred-id">ID: {c.credential_id}</span>' if c.credential_id else ""
+                c_items += f"""
+                <div class="cv-cert-item avoid-break">
+                    <div class="entry-header">
+                        <div>
+                            <span class="entry-title">{c.name}</span>
+                            {f'<span class="entry-sep">|</span> {c_issuer}' if c_issuer else ''}
+                            {f'<span class="entry-sep">|</span> {c_cred}' if c_cred else ''}
+                        </div>
+                        {c_date}
+                    </div>
+                </div>
+                """
+            certs_html = f"""
+            <div class="cv-section">
+                <div class="section-title">Certifications & Professional Credentials</div>
+                {c_items}
+            </div>
+            """
+
+        # Publications section
+        pub_html = ""
+        publications = getattr(resume, "publications", None) or []
+        if publications:
+            pub_items = "".join([f'<li class="avoid-break">{pub}</li>' for pub in publications])
+            pub_html = f"""
+            <div class="cv-section">
+                <div class="section-title">Publications & Thought Leadership</div>
+                <ul class="entry-bullets">
+                    {pub_items}
+                </ul>
+            </div>
+            """
+
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{resume.name} - Curriculum Vitae</title>
+<style>
+  :root {{
+    --primary-color: #0f172a;
+    --accent-color: #1e3a8a;
+    --accent-light: #2563eb;
+    --text-primary: #1e293b;
+    --text-muted: #64748b;
+    --border-color: #cbd5e1;
+    --bg-page: #f8fafc;
+    --bg-card: #f1f5f9;
+  }}
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text-primary);
+    background: var(--bg-page);
+    line-height: 1.5;
+    padding: 30px 15px;
+  }}
+  .paper {{
+    max-width: 860px;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 48px 56px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border-radius: 4px;
+  }}
+  .cv-badge {{
+    display: inline-block;
+    background: #e0e7ff;
+    color: var(--accent-color);
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+  }}
+  .header {{
+    text-align: center;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+  }}
+  .name {{
+    font-size: 24pt;
+    font-weight: 800;
+    color: var(--primary-color);
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }}
+  .title-tagline {{
+    font-size: 13pt;
+    font-weight: 600;
+    color: var(--accent-color);
+    margin-bottom: 8px;
+  }}
+  .contacts {{
+    font-size: 9pt;
+    color: var(--text-muted);
+  }}
+  .contacts a {{
+    color: var(--accent-light);
+    text-decoration: none;
+  }}
+  .cv-section {{
+    margin-bottom: 24px;
+  }}
+  .section-title {{
+    font-size: 11pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--accent-color);
+    border-bottom: 1.5px solid var(--border-color);
+    padding-bottom: 4px;
+    margin-bottom: 14px;
+  }}
+  .summary-text {{
+    font-size: 9.5pt;
+    color: var(--text-primary);
+    line-height: 1.6;
+    text-align: justify;
+  }}
+  .skill-row {{
+    display: flex;
+    font-size: 9.5pt;
+    margin-bottom: 6px;
+  }}
+  .skill-cat {{
+    font-weight: 700;
+    color: var(--primary-color);
+    width: 170px;
+    flex-shrink: 0;
+  }}
+  .skill-items {{
+    color: var(--text-primary);
+  }}
+  .cv-entry {{
+    margin-bottom: 16px;
+  }}
+  .cv-project-card {{
+    background: var(--bg-card);
+    border-left: 3px solid var(--accent-color);
+    padding: 10px 14px;
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 12px;
+  }}
+  .project-desc {{
+    font-size: 9pt;
+    color: var(--text-primary);
+    margin: 4px 0 6px 0;
+    line-height: 1.45;
+  }}
+  .tech-stack {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }}
+  .tech-badge {{
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 7.5pt;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }}
+  .cv-cert-item {{
+    margin-bottom: 8px;
+  }}
+  .entry-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }}
+  .entry-title {{
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: var(--primary-color);
+  }}
+  .entry-sep {{
+    color: var(--border-color);
+    margin: 0 4px;
+  }}
+  .entry-subtitle {{
+    font-size: 10pt;
+    font-weight: 600;
+    color: var(--accent-color);
+  }}
+  .entry-meta {{
+    text-align: right;
+  }}
+  .entry-period {{
+    font-size: 9pt;
+    font-weight: 500;
+    color: var(--text-muted);
+  }}
+  .exp-location {{
+    font-size: 8.5pt;
+    color: var(--text-muted);
+    margin-left: 8px;
+  }}
+  .entry-bullets {{
+    margin-left: 18px;
+    font-size: 9.5pt;
+    color: var(--text-primary);
+    line-height: 1.5;
+  }}
+  .entry-bullets li {{
+    margin-bottom: 3px;
+  }}
+  .entry-link {{
+    font-size: 8.5pt;
+    color: var(--accent-light);
+    text-decoration: none;
+    font-weight: 600;
+    margin-left: 6px;
+  }}
+  .cred-id {{
+    font-size: 8.5pt;
+    color: var(--text-muted);
+  }}
+  .highlighted-bullet {{
+    background-color: #fef08a;
+    border-radius: 2px;
+    padding: 0 2px;
+  }}
+  .avoid-break {{
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }}
+  @media print {{
+    body {{
+      background: #ffffff;
+      padding: 0;
+    }}
+    .paper {{
+      box-shadow: none;
+      padding: 0;
+      max-width: 100%;
+    }}
+    .cv-project-card {{
+      background: #f8fafc;
+      border-left: 3px solid #1e3a8a;
+    }}
+    .highlighted-bullet {{
+      background-color: transparent !important;
+      font-weight: 600;
+    }}
+    @page {{
+      margin: 15mm 15mm 15mm 15mm;
+      size: A4 portrait;
+    }}
+  }}
+</style>
+</head>
+<body>
+<div class="paper">
+  <div class="header">
+    <div class="cv-badge">Curriculum Vitae</div>
+    <h1 class="name">{resume.name}</h1>
+    <div class="title-tagline">{resume.title}</div>
+    <div class="contacts">{contact_html}</div>
+  </div>
+
+  <div class="cv-section">
+    <div class="section-title">Executive Career Architecture & Profile</div>
+    <p class="summary-text">{resume.summary}</p>
+  </div>
+
+  <div class="cv-section">
+    <div class="section-title">Comprehensive Technical Taxonomy & Skills</div>
+    {skills_html}
+  </div>
+
+  <div class="cv-section">
+    <div class="section-title">Professional Experience & Career History</div>
+    {exp_html}
+  </div>
+
+  {projects_html}
+
+  {certs_html}
+
+  {pub_html}
+
+  <div class="cv-section">
+    <div class="section-title">Education & Academic Background</div>
+    {edu_html}
+  </div>
+</div>
+</body>
+</html>
+"""
+
     def _render_compact(
         self,
         resume: ResumeData,
@@ -460,3 +895,4 @@ class TemplateEngine:
 
 
 template_engine = TemplateEngine()
+
