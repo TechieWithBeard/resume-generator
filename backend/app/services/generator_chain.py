@@ -11,7 +11,7 @@ import json
 import os
 import re
 from datetime import datetime
-from typing import AsyncGenerator, Dict, List, Optional, Set, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Optional, Set, Tuple
 
 from backend.app.models.resume import (
     AlignmentAuditItem,
@@ -175,6 +175,60 @@ class GeneratorChain:
         }
 
         # -------------------------------------------------------------
+        # STAGE 1.5: Company Intelligence & Web Research (CV Mode)
+        # -------------------------------------------------------------
+        company_research_data = None
+        if doc_type == "cv":
+            yield {
+                "type": "step",
+                "step": "research",
+                "title": "Company Intelligence & Web Research",
+                "status": "running",
+                "timestamp": now_str(),
+            }
+            await asyncio.sleep(0.15)
+
+            search_target = target_company or "Target Company"
+            yield {
+                "type": "thought",
+                "step": "research",
+                "content": f"🔍 [LangChain Web Search Tool] Initializing CompanyResearchTool for '{search_target}'...",
+                "timestamp": now_str(),
+            }
+            await asyncio.sleep(0.2)
+
+            from backend.app.services.company_research import company_research_tool
+
+            tool_input = {"company_name": search_target, "job_context": job_text}
+            try:
+                company_research_data = await company_research_tool.ainvoke(tool_input)
+            except Exception:
+                company_research_data = company_research_tool.invoke(tool_input)
+
+            source_label = "Live Web Intelligence" if "web" in str(company_research_data.get("source", "")) else "Job Specification Intelligence Extraction"
+            yield {
+                "type": "thought",
+                "step": "research",
+                "content": (
+                    f"✓ Company Intelligence Retrieved ({source_label}):\n"
+                    f"• Target Organization: {company_research_data.get('company_name')}\n"
+                    f"• Strategic Mission: {company_research_data.get('mission')[:180]}...\n"
+                    f"• Engineering Culture: {company_research_data.get('culture')}\n"
+                    f"• Technical Stack & Domain: {company_research_data.get('tech_focus')}"
+                ),
+                "timestamp": now_str(),
+            }
+            await asyncio.sleep(0.25)
+
+            yield {
+                "type": "step",
+                "step": "research",
+                "title": "Company Intelligence & Web Research",
+                "status": "done",
+                "timestamp": now_str(),
+            }
+
+        # -------------------------------------------------------------
         # STAGE 2: Ground Truth Audit & Competency Mapping
         # -------------------------------------------------------------
         yield {
@@ -282,7 +336,14 @@ class GeneratorChain:
                     "timestamp": now_str(),
                 }
                 async for chunk_ev in self._run_llm_alignment_stream(
-                    llm, base_resume, job_text, target_role, audit_report, company=target_company, doc_type=doc_type
+                    llm,
+                    base_resume,
+                    job_text,
+                    target_role,
+                    audit_report,
+                    company=target_company,
+                    doc_type=doc_type,
+                    company_research=company_research_data,
                 ):
                     if chunk_ev.get("type") == "llm_complete":
                         tailored_resume = chunk_ev["resume"]
@@ -306,7 +367,12 @@ class GeneratorChain:
         if not tailored_resume:
             # High-precision deterministic alignment engine with real-time paced reasoning stream
             async for chunk_ev in self._stream_heuristic_alignment(
-                base_resume, audit_report, target_role, company=target_company, doc_type=doc_type
+                base_resume,
+                audit_report,
+                target_role,
+                company=target_company,
+                doc_type=doc_type,
+                company_research=company_research_data,
             ):
                 if chunk_ev.get("type") == "heuristic_complete":
                     tailored_resume = chunk_ev["resume"]
@@ -350,7 +416,12 @@ class GeneratorChain:
         await asyncio.sleep(0.3)
 
         verified_resume, verification_audit = self._verify_anti_hallucination(
-            base_resume, tailored_resume, doc_type=doc_type, target_role=target_role, company=target_company
+            base_resume,
+            tailored_resume,
+            doc_type=doc_type,
+            target_role=target_role,
+            company=target_company,
+            company_research=company_research_data,
         )
         audit_report.anti_hallucination_audit = verification_audit
 
@@ -545,24 +616,26 @@ class GeneratorChain:
         target_role: str,
         company: Optional[str] = None,
         doc_type: str = "resume",
+        company_research: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[Dict, None]:
         """Paced real-time reasoning stream for deterministic alignment engine."""
         now_str = lambda: datetime.now().strftime("%H:%M:%S")
         company_phrase = f" at {company}" if company else ""
 
         if doc_type == "cv":
+            comp_display = (company_research.get("company_name") if company_research else None) or company or "Target Company"
             reasoning_steps = [
-                f"Analyzing executive scope: Strategic CV alignment for {target_role}{company_phrase}...\n",
-                f"Curating comprehensive technical taxonomy across: {', '.join(audit.direct_matches[:6])}...\n",
-                "Synthesizing architectural case studies and high-scale enterprise systems (AVEVA Nx monorepo)...\n",
-                "Integrating verified professional credentials, certifications, and leadership milestones...\n",
+                f"Analyzing executive scope: Synthesizing bespoke CV for {target_role} at {comp_display}...\n",
+                f"Formulating motivation statement: aligning candidate ethos with {comp_display}'s mission...\n",
+                f"Crafting strategic fit statement: connecting verified enterprise architecture track record to role...\n",
+                f"Harmonizing verified technical taxonomy across: {', '.join(audit.direct_matches[:6])}...\n",
             ]
         else:
             reasoning_steps = [
                 f"Analyzing role scope: Strategic alignment for {target_role}{company_phrase}...\n",
                 f"Mapping top verified competencies: {', '.join(audit.direct_matches[:5])}...\n",
-                "Elevating high-scale enterprise experience (AVEVA Nx monorepo, 25–35% build speedups)...\n",
-                "Synthesizing quantified achievements and harmonizing skill hierarchy...\n",
+                f"Elevating high-scale enterprise experience (AVEVA Nx monorepo, 25–35% build speedups)...\n",
+                f"Synthesizing quantified achievements and harmonizing skill hierarchy...\n",
             ]
 
         for step in reasoning_steps:
@@ -576,7 +649,9 @@ class GeneratorChain:
                 await asyncio.sleep(0.04)
             await asyncio.sleep(0.1)
 
-        tailored = self._align_resume_heuristically(base, audit, target_role, company=company, doc_type=doc_type)
+        tailored = self._align_resume_heuristically(
+            base, audit, target_role, company=company, doc_type=doc_type, company_research=company_research
+        )
         yield {"type": "heuristic_complete", "resume": tailored}
 
     def _align_resume_heuristically(
@@ -586,6 +661,7 @@ class GeneratorChain:
         target_role: str,
         company: Optional[str] = None,
         doc_type: str = "resume",
+        company_research: Optional[Dict[str, Any]] = None,
     ) -> ResumeData:
         """
         High-precision deterministic alignment that reframes summary and elevates matching highlights
@@ -729,6 +805,32 @@ class GeneratorChain:
                 "Architecture Guide: Migrating Legacy Enterprise Web Platforms to Signals & Standalone Components",
             ]
 
+        why_company = ""
+        why_fit = ""
+        if doc_type == "cv":
+            comp_name = (company_research.get("company_name") if company_research else None) or company or "your organization"
+            mission = (company_research.get("mission") if company_research else "") or "delivering mission-critical, high-impact digital solutions"
+            culture = (company_research.get("culture") if company_research else "") or "engineering excellence, architectural rigor, and cross-functional autonomy"
+            tech_focus = (company_research.get("tech_focus") if company_research else "") or "modern distributed systems and scalable, resilient frontend platforms"
+
+            why_company = (
+                f"I am strongly drawn to {comp_name} because of your clear commitment to {mission.rstrip('.')} "
+                f"and an engineering culture centered around {culture.rstrip('.')}. "
+                f"As a Senior Frontend Architect who thrives on solving complex challenges at scale, I am energized by {comp_name}'s "
+                f"focus on {tech_focus.rstrip('.')}. Joining your team represents an exceptional opportunity to contribute to "
+                f"mission-critical software while collaborating with forward-thinking engineers dedicated to craftsmanship and user experience."
+            )
+
+            why_fit = (
+                f"With over 7 years of hands-on frontend architecture and engineering leadership, I bring a track record that directly "
+                f"accelerates the objectives of the {target_role} position at {comp_name}. Having architected enterprise Nx monorepos, "
+                f"spearheaded zero-downtime migrations to modern reactive paradigms (Signals, standalone components, and Angular 20), "
+                f"and cut build and test execution cycles by 25–35%, I know how to deliver scalable, high-velocity frontend systems. "
+                f"Moreover, my extensive experience collaborating with distributed European engineering teams—including Dutch enterprise clients "
+                f"like Maistering B.V. and AVEVA—ensures I will immediately elevate code quality, frontend governance, and technical momentum "
+                f"across your engineering organization."
+            )
+
         return ResumeData(
             name=base.name,
             title=target_role,
@@ -749,6 +851,11 @@ class GeneratorChain:
             document_type="cv" if doc_type == "cv" else "resume",
             target_role=target_role,
             target_company=company,
+            why_company=why_company,
+            why_fit=why_fit,
+            company_research=company_research,
+            raw_text=base.raw_text,
+            additional_sections=base.additional_sections,
         )
 
     async def _run_llm_alignment_stream(
@@ -760,6 +867,7 @@ class GeneratorChain:
         audit: AlignmentReport,
         company: Optional[str] = None,
         doc_type: str = "resume",
+        company_research: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[Dict, None]:
         """
         Runs LangChain streaming chain (astream) with strict anti-hallucination system prompt.
@@ -769,18 +877,31 @@ class GeneratorChain:
         from langchain_core.messages import HumanMessage, SystemMessage
 
         if doc_type == "cv":
+            comp_intel = ""
+            if company_research:
+                comp_intel = (
+                    f"TARGET COMPANY DOSSIER (FROM LANGCHAIN WEB SEARCH TOOL):\n"
+                    f"- Company: {company_research.get('company_name', company or 'Target Company')}\n"
+                    f"- Mission: {company_research.get('mission', '')}\n"
+                    f"- Engineering Culture: {company_research.get('culture', '')}\n"
+                    f"- Technical Focus: {company_research.get('tech_focus', '')}\n"
+                    f"- Synthesis: {company_research.get('summary', '')}\n\n"
+                )
             system_prompt = (
                 "You are an expert Executive Career Strategist and CV Architect. Your mission is to align a candidate's "
-                "Curriculum Vitae (CV) to a target job description with STRICT ZERO HALLUCINATION.\n\n"
+                "Curriculum Vitae (CV) to a target job description and company with STRICT ZERO HALLUCINATION.\n\n"
+                f"{comp_intel}"
                 "STRICT CONSTRAINTS:\n"
                 "1. You MUST ONLY use the candidate's verified companies, employment dates, projects, and educational credentials. "
                 "NEVER invent new employers or change dates.\n"
                 "2. You MUST NOT add skills or tools the candidate has never used. Only emphasize and highlight real skills.\n"
-                "3. Emphasize comprehensive career achievements, architectural design decisions, system scale, and leadership.\n"
+                "3. In the output JSON, you MUST generate two dedicated bespoke paragraphs:\n"
+                "   - 'why_company': 1 inspiring, authentic paragraph answering why the candidate wants to join this specific company, directly integrating the company's mission and engineering culture.\n"
+                "   - 'why_fit': 1 powerful paragraph explaining why the candidate is an exceptional fit for the target role, connecting verified achievements and technical mastery directly to the position.\n"
                 "4. Maintain and preserve projects, certifications, and publications from the base profile.\n\n"
                 "TWO-PHASE OUTPUT REQUIREMENTS:\n"
                 "Phase 1: Write your Strategic Alignment Reasoning (3-5 concise sentences explaining the alignment strategy, "
-                "key technical skills prioritized, and high-impact achievements elevated).\n"
+                "company synergy, and high-impact achievements elevated).\n"
                 "Phase 2: Output the complete tailored CV JSON enclosed inside ```json ... ``` code blocks."
             )
         else:
@@ -836,7 +957,23 @@ class GeneratorChain:
                     }
 
                 # Emit informative milestone events as sections stream in
-                if '"summary"' in full_output and "summary" not in milestones_emitted:
+                if '"why_company"' in full_output and "why_company" not in milestones_emitted:
+                    milestones_emitted.add("why_company")
+                    yield {
+                        "type": "thought",
+                        "step": "synthesis",
+                        "content": f"Crafting tailored motivation statement on why the candidate wants to join {company or 'the organization'}...",
+                        "timestamp": now_str(),
+                    }
+                elif '"why_fit"' in full_output and "why_fit" not in milestones_emitted:
+                    milestones_emitted.add("why_fit")
+                    yield {
+                        "type": "thought",
+                        "step": "synthesis",
+                        "content": f"Formulating candidate strategic value proposition and exceptional fit for {target_role}...",
+                        "timestamp": now_str(),
+                    }
+                elif '"summary"' in full_output and "summary" not in milestones_emitted:
                     milestones_emitted.add("summary")
                     yield {
                         "type": "thought",
@@ -894,6 +1031,8 @@ class GeneratorChain:
             try:
                 data = json.loads(json_match.group(1))
                 tailored = ResumeData.model_validate(data)
+                if company_research and not getattr(tailored, "company_research", None):
+                    tailored.company_research = company_research
                 yield {"type": "llm_complete", "resume": tailored}
                 return
             except Exception as e:
@@ -908,6 +1047,7 @@ class GeneratorChain:
         doc_type: str = "resume",
         target_role: Optional[str] = None,
         company: Optional[str] = None,
+        company_research: Optional[Dict[str, Any]] = None,
     ) -> Tuple[ResumeData, List[AlignmentAuditItem]]:
         """
         Deterministic Verification Engine (Tier 2).
@@ -982,6 +1122,25 @@ class GeneratorChain:
 
         # 4. Invariance & Integrity for Projects & Certifications
         if doc_type == "cv":
+            # Ensure why_company and why_fit are present and populated
+            if not getattr(generated, "why_company", None) or not getattr(generated, "why_fit", None):
+                heuristic = self._align_resume_heuristically(
+                    base,
+                    AlignmentReport(match_score=80, target_role=target_role or "Senior Frontend Developer"),
+                    target_role=target_role or "Senior Frontend Developer",
+                    company=company,
+                    doc_type="cv",
+                    company_research=company_research or getattr(generated, "company_research", None),
+                )
+                if not getattr(generated, "why_company", None):
+                    generated.why_company = heuristic.why_company
+                if not getattr(generated, "why_fit", None):
+                    generated.why_fit = heuristic.why_fit
+                if not getattr(generated, "company_research", None):
+                    generated.company_research = heuristic.company_research or company_research
+            elif company_research and not getattr(generated, "company_research", None):
+                generated.company_research = company_research
+
             # Ensure CV has rich project case studies if omitted or empty
             if not generated.projects or not any(p.description for p in generated.projects):
                 if base.projects and any(p.description for p in base.projects):
@@ -993,6 +1152,7 @@ class GeneratorChain:
                         target_role=target_role or "Senior Frontend Developer",
                         company=company,
                         doc_type="cv",
+                        company_research=company_research or getattr(generated, "company_research", None),
                     )
                     generated.projects = heuristic.projects
 

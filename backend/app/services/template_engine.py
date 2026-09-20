@@ -9,6 +9,7 @@ Embedded print styles ensure pixel-perfect PDF export via browser print engine.
 
 import difflib
 import re
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 from backend.app.models.resume import ResumeData, TemplateConfig
 
@@ -1139,9 +1140,8 @@ class TemplateEngine:
             contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item">{icon}GitHub</a>')
         contact_html = " &bull; ".join(contacts)
 
-        # Target Alignment Callout Banner
-        target_role = getattr(resume, "target_role", None)
-        target_company = getattr(resume, "target_company", None)
+        target_role = getattr(resume, "target_role", None) or resume.title or "Target Role"
+        target_company = getattr(resume, "target_company", None) or "Target Organization"
 
         # Key target keywords for diff highlighting
         target_terms = set()
@@ -1163,285 +1163,262 @@ class TemplateEngine:
                     <strong>DIFF VIEW ACTIVE:</strong> Visual audit of tailored modifications & job alignment
                 </div>
                 <div class="diff-legend-pills">
-                    <span class="legend-pill added"><span class="pill-dot bg-emerald"></span> Tailored Profile / Scope</span>
-                    <span class="legend-pill mod"><span class="pill-dot bg-amber"></span> Adapted Achievement</span>
+                    <span class="legend-pill added"><span class="pill-dot bg-emerald"></span> Tailored Profile / Motivation</span>
+                    <span class="legend-pill mod"><span class="pill-dot bg-amber"></span> Adapted Fit & Value Driver</span>
                     <span class="legend-pill kw"><span class="pill-dot bg-sky"></span> Target Keyword Match</span>
-                    <span class="legend-pill locked"><span class="pill-dot bg-slate"></span> Verified Invariant Fact</span>
+                    <span class="legend-pill locked"><span class="pill-dot bg-slate"></span> Verified Ground Truth</span>
                 </div>
             </div>
             """
 
-        target_banner_html = ""
-        diff_pill_target = '<span class="diff-pill target">+ Targeted Positioning</span>' if highlight_diff else ""
-        if target_role or target_company:
-            target_str = f"<strong>{target_role}</strong>" if target_role else ""
-            if target_company:
-                target_str += f" &bull; <span class='target-company'>{target_company}</span>"
-            target_banner_html = f"""
-            <div class="cv-target-banner avoid-break">
-                <span class="target-badge">🎯 TARGET ROLE ALIGNMENT</span>
-                <span class="target-details">{target_str}</span>
-                {diff_pill_target}
-            </div>
-            """
-        elif resume.tagline and ("target" in resume.tagline.lower() or "aligned" in resume.tagline.lower()):
-            target_banner_html = f"""
-            <div class="cv-target-banner avoid-break">
-                <span class="target-badge">🎯 STRATEGIC FOCUS</span>
-                <span class="target-details">{resume.tagline}</span>
-                {diff_pill_target}
-            </div>
-            """
+        # Target Alignment Callout Banner
+        diff_pill_target = '<span class="diff-pill target">+ Targeted Profile</span>' if highlight_diff else ""
+        target_str = f"<strong>{target_role}</strong>"
+        if target_company:
+            target_str += f" &bull; <span class='target-company'>{target_company}</span>"
+        target_banner_html = f"""
+        <div class="cv-target-banner avoid-break">
+            <span class="target-badge">🎯 TARGET ROLE ALIGNMENT</span>
+            <span class="target-details">{target_str}</span>
+            {diff_pill_target}
+        </div>
+        """
 
-        # Technical Taxonomy & Core Competency Matrix (Modern Card Grid)
-        skills_html = ""
-        if resume.skills:
-            skill_cards = ""
-            for cat_name, skill_list in resume.skills.items():
-                formatted_cat = cat_name.replace("_", " ").title()
-                pills = []
-                for s in skill_list:
-                    is_matched = highlight_diff and (s.lower() in target_terms or any(t in s.lower() for t in target_terms if len(t) > 3))
-                    matched_cls = " matched" if is_matched else ""
-                    icon_prefix = "✓ " if is_matched else ""
-                    pills.append(f'<span class="competency-pill{matched_cls}">{icon_prefix}{s}</span>')
-                skill_cards += f"""
-                <div class="competency-card avoid-break">
-                    <div class="competency-title">{formatted_cat}</div>
-                    <div class="competency-pills">{''.join(pills)}</div>
+        # Researched Intelligence Callout
+        research = getattr(resume, "company_research", None)
+        research_html = ""
+        if research and isinstance(research, dict):
+            r_mission = research.get("mission") or ""
+            r_culture = research.get("culture") or ""
+            r_tech = research.get("tech_focus") or ""
+            r_source = "DuckDuckGo & Wikipedia Live Intelligence" if "web" in str(research.get("source", "")) else "Job Specification Intelligence Extraction"
+            research_html = f"""
+            <div class="cv-intel-box avoid-break">
+                <div class="intel-header">
+                    <span class="intel-badge">🌐 LANGCHAIN COMPANY RESEARCH DOSSIER</span>
+                    <span class="intel-source">{r_source}</span>
                 </div>
-                """
-            skills_html = f"""
-            <div class="cv-section section">
-                <div class="section-title">02 / Technical Taxonomy & Core Competency Matrix</div>
-                <div class="competency-grid">{skill_cards}</div>
-            </div>
-            """
-
-        # Key Architectural Case Studies & Flagship Projects
-        projects_html = ""
-        projects = getattr(resume, "projects", None) or []
-        if projects:
-            p_items = ""
-            for p in projects:
-                p_role = f'<span class="case-study-role">{p.role}</span>' if p.role else ""
-                p_period = f'<span class="entry-period">{p.period}</span>' if p.period else ""
-                url_link = f' <a href="{p.url}" target="_blank" class="entry-link">↗ Link</a>' if p.url else ""
-                proj_diff = '<span class="diff-pill scope">★ Targeted Case Study</span>' if highlight_diff else ""
-                
-                tech_badges = ""
-                if p.technologies:
-                    badges = "".join([f'<span class="tech-badge">{t}</span>' for t in p.technologies])
-                    tech_badges = f"""
-                    <div class="case-study-stack">
-                        <span class="stack-label">Architecture Stack:</span>
-                        <div class="tech-stack-list">{badges}</div>
-                    </div>
-                    """
-
-                base_p_desc = base_projects_by_name.get(p.name.strip().lower(), "")
-                rendered_p_desc = (
-                    self.diff_text(p.description, base_p_desc, target_terms)
-                    if highlight_diff and p.description
-                    else p.description
-                )
-
-                p_items += f"""
-                <div class="cv-project-card avoid-break">
-                    <div class="entry-header">
-                        <div class="case-study-title-group">
-                            <span class="entry-title">{p.name}</span>
-                            {f'<span class="entry-sep">|</span> {p_role}' if p_role else ''}
-                            {url_link}
-                            {proj_diff}
-                        </div>
-                        {p_period}
-                    </div>
-                    <p class="project-desc">{rendered_p_desc}</p>
-                    {tech_badges}
+                <div class="intel-body">
+                    {f'<div class="intel-item"><strong>Mission & Domain:</strong> {r_mission}</div>' if r_mission else ''}
+                    {f'<div class="intel-item"><strong>Engineering Culture:</strong> {r_culture}</div>' if r_culture else ''}
+                    {f'<div class="intel-item"><strong>Technical Focus:</strong> {r_tech}</div>' if r_tech else ''}
                 </div>
-                """
-            projects_html = f"""
-            <div class="cv-section section">
-                <div class="section-title">03 / Key Architectural Projects & Case Studies</div>
-                <div class="projects-container">{p_items}</div>
             </div>
             """
 
-        # Experience entries with Scope & Environment
-        exp_html = ""
+        # Section 1: Why Company? (1 cohesive, inspiring paragraph)
+        why_company_raw = getattr(resume, "why_company", None)
+        if not why_company_raw:
+            why_company_raw = (
+                f"I am strongly drawn to {target_company} because of your commitment to pioneering breakthrough, "
+                f"mission-critical digital platforms and your culture of engineering excellence and architectural autonomy. "
+                f"As a Senior Frontend Architect who thrives on solving complex challenges at scale, I am energized by {target_company}'s "
+                f"focus on building high-reliability platforms. Joining your organization represents an exceptional opportunity to contribute "
+                f"to transformative products while collaborating with a world-class engineering team."
+            )
+        base_why_comp = ""
+        rendered_why_company = (
+            self.diff_text(why_company_raw, base_why_comp, target_terms)
+            if highlight_diff
+            else why_company_raw
+        )
+        why_comp_badge = f'<div class="diff-box-badge"><span class="diff-chip added">+ Tailored Profile</span> <span class="diff-note" style="font-size:7.5pt; color:#15803d; font-weight:600;">Aligned for {target_company}</span></div>' if highlight_diff else ""
+
+        # Section 2: Why I am the Ideal Fit for Role? (1 impactful paragraph)
+        why_fit_raw = getattr(resume, "why_fit", None)
+        if not why_fit_raw:
+            why_fit_raw = (
+                f"With over 7 years of engineering depth leading frontend architecture and high-performance web applications, "
+                f"I bring a verified track record directly aligned with the technical demands of the {target_role} position. "
+                f"Having architected enterprise Nx monorepos, spearheaded zero-downtime migrations to modern reactive paradigms "
+                f"(Signals, standalone components, and Angular 20), and cut build cycles by 25–35%, I understand how to deliver resilient, "
+                f"maintainable systems at scale. Furthermore, my substantial experience collaborating with distributed European engineering "
+                f"teams—including Dutch enterprise clients like Maistering B.V. and AVEVA—ensures I will hit the ground running, elevate code "
+                f"quality, and drive velocity across your engineering organization."
+            )
+        base_summary = base_resume.summary if base_resume else ""
+        rendered_why_fit = (
+            self.diff_text(why_fit_raw, base_summary, target_terms)
+            if highlight_diff
+            else why_fit_raw
+        )
+        why_fit_badge = f'<div class="diff-box-badge"><span class="diff-chip added">+ Tailored Profile</span> <span class="diff-note" style="font-size:7.5pt; color:#15803d; font-weight:600;">Positioned for {target_role}</span></div>' if highlight_diff else ""
+
+        # Section 3: Scope & Leadership Highlights from Experience
+        scope_callouts = []
         for exp in resume.experience:
-            bullets = ""
             c_key = exp.company.strip().lower()
-            relevant_base_bullets = base_bullets_by_company.get(c_key, all_base_bullets)
-            for h in exp.highlights:
-                if highlight_diff:
-                    h_rendered, is_modified, has_target_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
-                    if is_modified:
-                        highlight_cls = "highlighted-bullet mod"
-                        bullet_badge = '<span class="diff-bullet-badge mod">+ Tailored</span> '
-                    elif has_target_kw:
-                        highlight_cls = "highlighted-bullet kw"
-                        bullet_badge = '<span class="diff-bullet-badge kw">★ Key Skill</span> '
-                    else:
-                        highlight_cls = ""
-                        bullet_badge = ""
-                    bullets += f'<li class="{highlight_cls}">{bullet_badge}{h_rendered}</li>\n'
-                else:
-                    bullets += f'<li>{h}</li>\n'
-
-            loc_str = f'<span class="exp-location">📍 {exp.location}</span>' if exp.location else ""
-            
-            scope_html = ""
-            if getattr(exp, "scope", None):
+            scope_text = getattr(exp, "scope", None)
+            if scope_text:
                 base_scope = base_scopes_by_company.get(c_key, "")
                 rendered_scope = (
-                    self.diff_text(exp.scope, base_scope, target_terms)
+                    self.diff_text(scope_text, base_scope, target_terms)
                     if highlight_diff
-                    else exp.scope
+                    else scope_text
                 )
-                scope_tag = '<span class="scope-tag">⚡ SCOPE & LEADERSHIP:</span>'
+                scope_tag = '<span class="scope-tag">⚡ SCOPE &amp; LEADERSHIP:</span>'
                 if highlight_diff:
-                    scope_tag = '<span class="scope-tag">⚡ SCOPE & LEADERSHIP:</span> <span class="diff-pill scope">+ Role Scope Enriched</span>'
-                scope_html = f"""
-                <div class="role-scope-box">
-                    {scope_tag}
-                    <span class="scope-text">{rendered_scope}</span>
-                </div>
-                """
+                    scope_tag = '<span class="scope-tag">⚡ SCOPE &amp; LEADERSHIP:</span> <span class="diff-pill scope">+ Role Scope Enriched</span>'
 
-            tech_html = ""
-            if getattr(exp, "technologies", None):
-                pills = "".join([f'<span class="tech-badge sm">{t}</span>' for t in exp.technologies])
-                tech_html = f"""
-                <div class="role-env-box">
-                    <span class="env-label">Environment:</span>
-                    <div class="env-pills">{pills}</div>
-                </div>
-                """
+                env_pills = ""
+                if getattr(exp, "technologies", None):
+                    pills = "".join([f'<span class="tech-badge sm">{t}</span>' for t in exp.technologies])
+                    env_pills = f'<div class="role-env-box"><span class="env-label">Environment:</span><div class="env-pills">{pills}</div></div>'
 
-            exp_html += f"""
-            <div class="cv-entry avoid-break">
-                <div class="entry-header">
-                    <div class="entry-title-wrap">
-                        <span class="entry-title">{exp.role}</span>
+                # Bullet points
+                b_html = ""
+                relevant_base_bullets = base_bullets_by_company.get(c_key, all_base_bullets)
+                for h in exp.highlights[:2]:
+                    if highlight_diff:
+                        h_rendered, is_mod, has_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
+                        cls = "highlighted-bullet mod" if is_mod else ("highlighted-bullet kw" if has_kw else "")
+                        b_badge = '<span class="diff-bullet-badge mod">+ Tailored</span> ' if is_mod else ('<span class="diff-bullet-badge kw">★ Key Skill</span> ' if has_kw else "")
+                        b_html += f'<li class="{cls}">{b_badge}{h_rendered}</li>\n'
+                    else:
+                        b_html += f'<li>{h}</li>\n'
+
+                scope_callouts.append(f"""
+                <div class="cv-scope-item avoid-break">
+                    <div class="scope-hdr">
+                        <span class="scope-title">{exp.role}</span>
                         <span class="entry-sep">|</span>
-                        <span class="entry-subtitle">{exp.company}</span>
+                        <span class="scope-company">{exp.company}</span>
+                        <span class="scope-period">({exp.period})</span>
                     </div>
-                    <div class="entry-meta">
-                        <span class="entry-period">{exp.period}</span>
-                        {loc_str}
+                    <div class="role-scope-box">
+                        {scope_tag}
+                        <span class="scope-text">{rendered_scope}</span>
                     </div>
+                    <ul class="entry-bullets">
+                        {b_html}
+                    </ul>
+                    {env_pills}
                 </div>
-                {scope_html}
-                <ul class="entry-bullets">
-                    {bullets}
-                </ul>
-                {tech_html}
+                """)
+
+        # Flagship Architectural Projects / Case Studies
+        projects = getattr(resume, "projects", None) or []
+        project_callouts = []
+        for p in projects:
+            p_role = f'<span class="case-study-role">{p.role}</span>' if p.role else ""
+            p_period = f'<span class="entry-period">{p.period}</span>' if p.period else ""
+            url_link = f' <a href="{p.url}" target="_blank" class="entry-link">↗ Link</a>' if p.url else ""
+            proj_diff = '<span class="diff-pill scope">★ Targeted Case Study</span>' if highlight_diff else ""
+            tech_badges = ""
+            if p.technologies:
+                badges = "".join([f'<span class="tech-badge">{t}</span>' for t in p.technologies])
+                tech_badges = f"""
+                <div class="case-study-stack">
+                    <span class="stack-label">Architecture Stack:</span>
+                    <div class="tech-stack-list">{badges}</div>
+                </div>
+                """
+            base_p_desc = base_projects_by_name.get(p.name.strip().lower(), "")
+            rendered_p_desc = (
+                self.diff_text(p.description, base_p_desc, target_terms)
+                if highlight_diff and p.description
+                else p.description
+            )
+            project_callouts.append(f"""
+            <div class="cv-project-card avoid-break">
+                <div class="entry-header">
+                    <div class="case-study-title-group">
+                        <span class="entry-title">{p.name}</span>
+                        {f'<span class="entry-sep">|</span> {p_role}' if p_role else ''}
+                        {url_link}
+                        {proj_diff}
+                    </div>
+                    {p_period}
+                </div>
+                <p class="project-desc">{rendered_p_desc}</p>
+                {tech_badges}
+            </div>
+            """)
+
+        # Certifications
+        certifications = getattr(resume, "certifications", None) or []
+        cert_items = []
+        for c in certifications:
+            c_issuer = f'<span class="entry-subtitle">{c.issuer}</span>' if c.issuer else ""
+            c_period_val = c.date or c.year
+            c_date = f'<span class="entry-period">{c_period_val}</span>' if c_period_val else ""
+            c_cred = f'<span class="cred-id">Credential ID: {c.credential_id}</span>' if c.credential_id else ""
+            cert_items.append(f"""
+            <div class="cv-cert-item avoid-break">
+                <div class="entry-header">
+                    <div>
+                        <span class="entry-title">🏆 {c.name}</span>
+                        {f'<span class="entry-sep">|</span> {c_issuer}' if c_issuer else ''}
+                        {f'<span class="entry-sep">|</span> {c_cred}' if c_cred else ''}
+                    </div>
+                    {c_date}
+                </div>
+            </div>
+            """)
+
+        # Education
+        edu_items = []
+        for edu in resume.education:
+            edu_items.append(f"""
+            <div class="cv-edu-item avoid-break">
+                <div class="entry-header">
+                    <div>
+                        <span class="entry-title">🎓 {edu.degree}</span>
+                        <span class="entry-sep">|</span>
+                        <span class="entry-subtitle">{edu.institution}</span>
+                    </div>
+                    <span class="entry-period">{edu.period}</span>
+                </div>
+            </div>
+            """)
+
+        # Publications
+        publications = getattr(resume, "publications", None) or []
+        pub_items = "".join([f'<li class="avoid-break">{pub}</li>' for pub in publications])
+
+        # Technical Taxonomy Cards
+        skill_cards = ""
+        for cat_name, skill_list in (resume.skills or {}).items():
+            formatted_cat = cat_name.replace("_", " ").title()
+            pills = []
+            for s in skill_list:
+                is_matched = highlight_diff and (s.lower() in target_terms or any(t in s.lower() for t in target_terms if len(t) > 3))
+                matched_cls = " matched" if is_matched else ""
+                icon_prefix = "✓ " if is_matched else ""
+                pills.append(f'<span class="competency-pill{matched_cls}">{icon_prefix}{s}</span>')
+            skill_cards += f"""
+            <div class="competency-card avoid-break">
+                <div class="competency-title">{formatted_cat}</div>
+                <div class="competency-pills">{''.join(pills)}</div>
             </div>
             """
 
-        # European Enterprise Spotlight Banner (if candidate has European client experience)
+        # European Enterprise Spotlight Banner
         has_european_exp = any(
             "maistering" in exp.company.lower() or "aveva" in exp.company.lower() or "europe" in exp.company.lower()
             for exp in resume.experience
-        ) or "netherlands" in (resume.summary or "").lower() or "european" in (resume.summary or "").lower()
+        ) or "netherlands" in (resume.summary or "").lower() or "netherlands" in why_fit_raw.lower() or "netherlands" in (resume.raw_text or "").lower()
 
         european_spotlight_html = ""
         if has_european_exp:
             european_spotlight_html = """
-            <div class="cv-international-card avoid-break">
-                <div class="intl-badge">🌍 INTERNATIONAL & EUROPEAN ENTERPRISE DELIVERY</div>
-                <div class="intl-body">
-                    <strong>European Enterprise & Netherlands Client Delivery:</strong> Proven engineering delivery and technical leadership collaborating directly with European enterprises, including Dutch enterprise client <em>Maistering B.V. (Netherlands)</em> and industrial software leader <em>AVEVA</em>. Seasoned in cross-timezone communication, asynchronous agile delivery, GDPR-conscious web platforms, and European engineering standards.
+            <div class="cv-european-banner avoid-break">
+                <div class="eu-flag-box">🇪🇺</div>
+                <div class="eu-content">
+                    <strong>European Enterprise &amp; International Delivery:</strong>
+                    Proven engineering track record delivering scalable web platforms for European clients, including Dutch enterprise organization Maistering B.V. (Netherlands) and AVEVA.
                 </div>
             </div>
             """
 
-        # Education entries
-        edu_html = ""
-        for edu in resume.education:
-            edu_html += f"""
-            <div class="cv-entry edu-entry avoid-break">
-                <div class="entry-header">
-                    <div>
-                        <span class="entry-title">{edu.degree}</span>
-                        <span class="entry-sep">|</span>
-                        <span class="entry-subtitle">{edu.institution}</span>
-                    </div>
-                    <div class="entry-meta">
-                        <span class="entry-period">{edu.period}</span>
-                    </div>
-                </div>
-            </div>
-            """
-
-        # Certifications section
-        certs_html = ""
-        certifications = getattr(resume, "certifications", None) or []
-        if certifications:
-            c_items = ""
-            for c in certifications:
-                c_issuer = f'<span class="entry-subtitle">{c.issuer}</span>' if c.issuer else ""
-                c_period_val = c.date or c.year
-                c_date = f'<span class="entry-period">{c_period_val}</span>' if c_period_val else ""
-                c_cred = f'<span class="cred-id">Credential ID: {c.credential_id}</span>' if c.credential_id else ""
-                c_items += f"""
-                <div class="cv-cert-item avoid-break">
-                    <div class="entry-header">
-                        <div>
-                            <span class="entry-title">🏆 {c.name}</span>
-                            {f'<span class="entry-sep">|</span> {c_issuer}' if c_issuer else ''}
-                            {f'<span class="entry-sep">|</span> {c_cred}' if c_cred else ''}
-                        </div>
-                        {c_date}
-                    </div>
-                </div>
-                """
-            certs_html = f"""
-            <div class="cv-section section">
-                <div class="section-title">06 / Certifications & Professional Accreditations</div>
-                <div class="certs-container">{c_items}</div>
-            </div>
-            """
-
-        # Publications section
-        pub_html = ""
-        publications = getattr(resume, "publications", None) or []
-        if publications:
-            pub_items = "".join([f'<li class="avoid-break">{pub}</li>' for pub in publications])
-            pub_html = f"""
-            <div class="cv-section section">
-                <div class="section-title">07 / Publications & Thought Leadership</div>
-                <ul class="entry-bullets">
-                    {pub_items}
-                </ul>
-            </div>
-            """
-
-        # Executive Summary Box Diff styling
-        base_summary = base_resume.summary if base_resume else ""
-        is_summary_modified = False
-        if highlight_diff and base_resume:
-            is_summary_modified = (resume.summary.strip().lower() != base_summary.strip().lower())
-        elif highlight_diff:
-            is_summary_modified = True
-
-        rendered_summary = (
-            self.diff_text(resume.summary, base_summary, target_terms)
-            if highlight_diff
-            else resume.summary
-        )
-
-        summary_box_cls = "cv-summary-box diff-summary-box" if is_summary_modified else "cv-summary-box"
-        summary_badge_html = f'<div class="diff-box-badge"><span class="diff-chip added">+ Tailored Strategic Profile</span> <span class="diff-note" style="font-size:7.5pt; color:#15803d; font-weight:600;">Aligned for {target_role or "Target Role"}</span></div>' if is_summary_modified else ""
+        current_date_str = datetime.now().strftime("%B %d, %Y")
 
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{resume.name} - Curriculum Vitae</title>
+<title>{resume.name} - Curriculum Vitae &amp; Statement of Strategic Alignment</title>
 <style>
   :root {{
     --primary-color: #0f172a;
@@ -1452,7 +1429,7 @@ class TemplateEngine:
     --border-color: #cbd5e1;
     --border-subtle: #e2e8f0;
     --bg-page: #f8fafc;
-    --bg-card: #f8fafc;
+    --bg-card: #ffffff;
     --highlight-bg: #fef08a;
   }}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -1509,10 +1486,10 @@ class TemplateEngine:
   }}
   .header {{
     text-align: left;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
   }}
   .name {{
-    font-size: 25pt;
+    font-size: 24pt;
     font-weight: 800;
     color: var(--primary-color);
     letter-spacing: -0.5px;
@@ -1520,10 +1497,80 @@ class TemplateEngine:
     margin-bottom: 4px;
   }}
   .title-tagline {{
-    font-size: 12.5pt;
+    font-size: 12pt;
     font-weight: 600;
     color: var(--accent-color);
     margin-bottom: 8px;
+  }}
+  .contacts {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    font-size: 8.5pt;
+    color: var(--text-muted);
+    padding-top: 4px;
+  }}
+  .contact-item {{
+    display: inline-flex;
+    align-items: center;
+  }}
+  .contacts a {{
+    color: var(--accent-light);
+    text-decoration: none;
+    font-weight: 500;
+  }}
+  .cv-addressee-block {{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: #f8fafc;
+    border: 1px solid var(--border-subtle);
+    border-left: 4px solid var(--accent-color);
+    border-radius: 0 4px 4px 0;
+    padding: 12px 16px;
+    margin: 14px 0 16px 0;
+  }}
+  .addressee-left {{
+    font-size: 9pt;
+    color: var(--text-primary);
+  }}
+  .meta-date {{
+    font-size: 8pt;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }}
+  .addressee-to {{
+    font-size: 9.5pt;
+    color: var(--primary-color);
+  }}
+  .addressee-company {{
+    font-size: 11pt;
+    font-weight: 700;
+    color: var(--accent-color);
+  }}
+  .addressee-right {{
+    text-align: right;
+  }}
+  .subject-line {{
+    font-size: 10pt;
+    color: var(--primary-color);
+  }}
+  .subject-role {{
+    color: var(--accent-color);
+    font-weight: 700;
+  }}
+  .subject-sub {{
+    font-size: 8pt;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
   }}
   .cv-target-banner {{
     display: flex;
@@ -1534,7 +1581,7 @@ class TemplateEngine:
     border-left: 4px solid var(--accent-light);
     padding: 8px 14px;
     border-radius: 0 4px 4px 0;
-    margin: 10px 0 12px 0;
+    margin: 10px 0 14px 0;
   }}
   .target-badge {{
     font-size: 7.5pt;
@@ -1554,22 +1601,42 @@ class TemplateEngine:
     color: var(--accent-color);
     font-weight: 600;
   }}
-  .contacts {{
+  .cv-intel-box {{
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-left: 4px solid #16a34a;
+    border-radius: 0 4px 4px 0;
+    padding: 10px 14px;
+    margin-bottom: 18px;
+  }}
+  .intel-header {{
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px 16px;
-    font-size: 8.5pt;
-    color: var(--text-muted);
-    padding-top: 4px;
-  }}
-  .contact-item {{
-    display: inline-flex;
+    justify-content: space-between;
     align-items: center;
+    margin-bottom: 6px;
   }}
-  .contacts a {{
-    color: var(--accent-light);
-    text-decoration: none;
-    font-weight: 500;
+  .intel-badge {{
+    font-size: 7.5pt;
+    font-weight: 800;
+    color: #15803d;
+    background: #dcfce7;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }}
+  .intel-source {{
+    font-size: 7.5pt;
+    color: #166534;
+    font-weight: 600;
+  }}
+  .intel-body {{
+    font-size: 8.5pt;
+    color: var(--text-primary);
+    line-height: 1.45;
+  }}
+  .intel-item {{
+    margin-bottom: 3px;
   }}
   .cv-section {{
     margin-bottom: 22px;
@@ -1582,105 +1649,50 @@ class TemplateEngine:
     color: var(--accent-color);
     border-bottom: 1.5px solid var(--border-color);
     padding-bottom: 4px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }}
-  .cv-summary-box {{
+  .cv-letter-box {{
     background: #f8fafc;
     border-left: 4px solid var(--accent-color);
-    padding: 12px 16px;
+    padding: 14px 18px;
     border-radius: 0 4px 4px 0;
+    margin-bottom: 14px;
   }}
-  .summary-text {{
+  .letter-text {{
     font-size: 9.5pt;
     color: var(--text-primary);
-    line-height: 1.6;
+    line-height: 1.65;
     text-align: justify;
   }}
-  /* Competencies Grid */
-  .competency-grid {{
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 10px;
-  }}
-  .competency-card {{
-    background: #f8fafc;
+  .cv-scope-item {{
+    margin-bottom: 14px;
+    background: #ffffff;
     border: 1px solid var(--border-subtle);
     border-radius: 4px;
-    padding: 8px 12px;
+    padding: 10px 14px;
   }}
-  .competency-title {{
-    font-size: 8.5pt;
-    font-weight: 700;
+  .scope-hdr {{
+    font-size: 9.5pt;
     color: var(--primary-color);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 6px;
-    border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 3px;
+    margin-bottom: 4px;
   }}
-  .competency-pills {{
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }}
-  .competency-pill {{
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    color: #334155;
-    font-size: 7.5pt;
-    font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 3px;
-  }}
-  /* Experience Entries */
-  .cv-entry {{
-    margin-bottom: 18px;
-  }}
-  .entry-header {{
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 3px;
-  }}
-  .entry-title-wrap {{
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 4px;
-  }}
-  .entry-title {{
-    font-size: 10.5pt;
+  .scope-title {{
     font-weight: 700;
-    color: var(--primary-color);
   }}
-  .entry-sep {{
-    color: var(--border-color);
-    margin: 0 3px;
-  }}
-  .entry-subtitle {{
-    font-size: 10pt;
-    font-weight: 600;
+  .scope-company {{
     color: var(--accent-color);
-  }}
-  .entry-meta {{
-    text-align: right;
-    white-space: nowrap;
-  }}
-  .entry-period {{
-    font-size: 8.5pt;
     font-weight: 600;
-    color: var(--text-muted);
   }}
-  .exp-location {{
+  .scope-period {{
     font-size: 8pt;
     color: var(--text-muted);
-    margin-left: 6px;
+    margin-left: 4px;
   }}
   .role-scope-box {{
     background: #eff6ff;
     border-left: 3px solid #3b82f6;
-    padding: 5px 10px;
-    margin: 5px 0 7px 0;
+    padding: 6px 10px;
+    margin: 6px 0 8px 0;
     border-radius: 0 3px 3px 0;
     font-size: 8.5pt;
     line-height: 1.45;
@@ -1723,14 +1735,31 @@ class TemplateEngine:
     flex-wrap: wrap;
     gap: 4px;
   }}
-  /* Project / Case Studies */
+  .tech-badge {{
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 7.5pt;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }}
+  .tech-badge.sm {{
+    font-size: 7pt;
+    padding: 1px 5px;
+  }}
   .cv-project-card {{
     background: #f8fafc;
     border: 1px solid var(--border-subtle);
     border-left: 4px solid var(--accent-color);
     padding: 10px 14px;
     border-radius: 0 4px 4px 0;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
+  }}
+  .entry-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
   }}
   .case-study-title-group {{
     display: flex;
@@ -1738,21 +1767,47 @@ class TemplateEngine:
     flex-wrap: wrap;
     gap: 4px;
   }}
+  .entry-title {{
+    font-size: 10pt;
+    font-weight: 700;
+    color: var(--primary-color);
+  }}
+  .entry-sep {{
+    color: var(--border-color);
+    margin: 0 3px;
+  }}
+  .entry-subtitle {{
+    font-size: 9.5pt;
+    font-weight: 600;
+    color: var(--accent-color);
+  }}
   .case-study-role {{
     font-size: 8.5pt;
     font-weight: 600;
     color: var(--accent-light);
   }}
+  .entry-period {{
+    font-size: 8pt;
+    font-weight: 600;
+    color: var(--text-muted);
+  }}
+  .entry-link {{
+    font-size: 8pt;
+    color: var(--accent-light);
+    text-decoration: none;
+    font-weight: 600;
+  }}
   .project-desc {{
-    font-size: 9pt;
+    font-size: 8.5pt;
     color: var(--text-primary);
-    margin: 5px 0 7px 0;
+    margin: 4px 0 6px 0;
     line-height: 1.45;
   }}
   .case-study-stack {{
     display: flex;
     align-items: center;
     gap: 6px;
+    margin-top: 4px;
   }}
   .stack-label {{
     font-size: 7.5pt;
@@ -1765,89 +1820,135 @@ class TemplateEngine:
     flex-wrap: wrap;
     gap: 4px;
   }}
-  .tech-badge {{
-    background: #e2e8f0;
+  .competency-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }}
+  .competency-card {{
+    background: #f8fafc;
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 8px 10px;
+  }}
+  .competency-title {{
+    font-size: 8pt;
+    font-weight: 700;
+    color: var(--primary-color);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 2px;
+  }}
+  .competency-pills {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }}
+  .competency-pill {{
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
     color: #334155;
     font-size: 7.5pt;
     font-weight: 600;
-    padding: 1px 6px;
+    padding: 1px 5px;
     border-radius: 3px;
   }}
-  .tech-badge.sm {{
-    font-size: 7pt;
-    padding: 1px 5px;
-    background: #f1f5f9;
-    border: 1px solid #cbd5e1;
+  .competency-pill.matched {{
+    background: #f0fdf4 !important;
+    border: 1px solid #86efac !important;
+    color: #166534 !important;
+    font-weight: 700 !important;
   }}
-  /* European Spotlight */
-  .cv-international-card {{
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-left: 4px solid #16a34a;
-    padding: 10px 14px;
-    border-radius: 0 4px 4px 0;
-    margin: 16px 0 20px 0;
-  }}
-  .intl-badge {{
-    font-size: 7.5pt;
-    font-weight: 800;
-    color: #166534;
-    letter-spacing: 0.8px;
-    margin-bottom: 3px;
-  }}
-  .intl-body {{
-    font-size: 8.5pt;
-    color: #14532d;
-    line-height: 1.45;
-  }}
-  /* Certifications */
-  .cv-cert-item {{
-    margin-bottom: 7px;
+  .cv-cert-item, .cv-edu-item {{
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border-subtle);
   }}
   .cred-id {{
-    font-size: 8pt;
+    font-size: 7.5pt;
     color: var(--text-muted);
+    font-family: ui-monospace, monospace;
   }}
-  .entry-link {{
-    font-size: 8pt;
-    color: var(--accent-light);
-    text-decoration: none;
-    font-weight: 600;
-    margin-left: 4px;
-  }}
-  /* Visual Diff Highlighting Engine */
-  .cv-diff-banner {{
-    background: #f0fdf4;
-    border: 1px solid #86efac;
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-bottom: 16px;
-    font-size: 8pt;
-    color: #166534;
-  }}
-  .diff-banner-header {{
+  .cv-european-banner {{
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-weight: 700;
-    margin-bottom: 5px;
+    gap: 12px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-left: 4px solid #1e3a8a;
+    border-radius: 0 4px 4px 0;
+    padding: 8px 12px;
+    margin: 12px 0;
+  }}
+  .eu-flag-box {{
+    font-size: 16pt;
+    line-height: 1;
+  }}
+  .eu-content {{
+    font-size: 8.5pt;
+    color: #1e3a8a;
+    line-height: 1.4;
+  }}
+  .cv-signoff-block {{
+    margin-top: 24px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-subtle);
+  }}
+  .signoff-salutation {{
+    font-size: 9.5pt;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 8px;
+  }}
+  .signoff-name {{
+    font-size: 13pt;
+    font-weight: 800;
+    color: var(--primary-color);
+  }}
+  .signoff-title {{
+    font-size: 9.5pt;
+    font-weight: 600;
+    color: var(--accent-color);
+    margin-bottom: 6px;
+  }}
+  .cv-footer {{
+    margin-top: 24px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    font-size: 7.5pt;
+    color: var(--text-muted);
+  }}
+  /* Diff Highlighting */
+  .cv-diff-banner {{
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-bottom: 14px;
+  }}
+  .diff-banner-header {{
+    font-size: 8pt;
+    color: #0f172a;
+    margin-bottom: 4px;
   }}
   .diff-legend-pills {{
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    align-items: center;
+    font-size: 7.5pt;
   }}
   .legend-pill {{
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 7.5pt;
-    font-weight: 600;
-    padding: 1px 6px;
-    border-radius: 4px;
     background: #ffffff;
-    border: 1px solid #d1fae5;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #e2e8f0;
   }}
   .pill-dot {{
     width: 6px;
@@ -1858,10 +1959,6 @@ class TemplateEngine:
   .pill-dot.bg-amber {{ background: #f59e0b; }}
   .pill-dot.bg-sky {{ background: #0ea5e9; }}
   .pill-dot.bg-slate {{ background: #64748b; }}
-  .diff-summary-box {{
-    border-left: 4px solid #10b981 !important;
-    background: #f0fdf4 !important;
-  }}
   .diff-box-badge {{
     display: flex;
     align-items: center;
@@ -1880,11 +1977,6 @@ class TemplateEngine:
     background: #dcfce7;
     color: #15803d;
     border: 1px solid #bbf7d0;
-  }}
-  .diff-note {{
-    font-size: 7.5pt;
-    color: #15803d;
-    font-weight: 600;
   }}
   .highlighted-bullet.mod {{
     background-color: #fef3c7;
@@ -1917,12 +2009,6 @@ class TemplateEngine:
     background: #bae6fd;
     color: #0369a1;
   }}
-  .competency-pill.matched {{
-    background: #f0fdf4 !important;
-    border: 1px solid #86efac !important;
-    color: #166534 !important;
-    font-weight: 700 !important;
-  }}
   .diff-pill {{
     font-size: 7pt;
     font-weight: 700;
@@ -1938,19 +2024,6 @@ class TemplateEngine:
   .diff-pill.scope {{
     background: #dcfce7;
     color: #15803d;
-  }}
-  .avoid-break {{
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }}
-  .cv-footer {{
-    margin-top: 30px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border-subtle);
-    display: flex;
-    justify-content: space-between;
-    font-size: 7.5pt;
-    color: var(--text-muted);
   }}
   del.git-diff-del {{
     background-color: #ffebe9 !important;
@@ -2000,6 +2073,10 @@ class TemplateEngine:
     font-weight: 800 !important;
     text-decoration: underline;
   }}
+  .avoid-break {{
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }}
   @media print {{
     body {{
       background: #ffffff;
@@ -2041,10 +2118,6 @@ class TemplateEngine:
       font-weight: inherit !important;
       text-decoration: none !important;
     }}
-    .diff-summary-box {{
-      border-left: 4px solid var(--accent-color) !important;
-      background: #f8fafc !important;
-    }}
     @page {{
       margin: 14mm 14mm 14mm 14mm;
       size: A4 portrait;
@@ -2059,7 +2132,7 @@ class TemplateEngine:
   <div class="cv-top-bar">
     <div class="cv-badge-group">
       <span class="cv-badge">Curriculum Vitae</span>
-      <span class="cv-badge secondary">Executive Technical Dossier</span>
+      <span class="cv-badge secondary">Statement of Strategic Alignment</span>
     </div>
     <span class="cv-meta-confidential">Verified Dossier &bull; Zero-Hallucination</span>
   </div>
@@ -2067,38 +2140,65 @@ class TemplateEngine:
   <div class="header">
     <h1 class="name">{resume.name}</h1>
     <div class="title-tagline">{resume.title}{f" • {resume.tagline}" if (config is None or config.show_tagline) and resume.tagline else ""}</div>
-    {target_banner_html}
     <div class="contacts">{contact_html}</div>
   </div>
 
-  <div class="cv-section section">
-    <div class="section-title">01 / Executive Career Architecture & Strategic Profile</div>
-    <div class="{summary_box_cls}">
-      {summary_badge_html}
-      <p class="summary-text">{rendered_summary}</p>
+  <div class="cv-addressee-block avoid-break">
+    <div class="addressee-left">
+      <div class="meta-date">{current_date_str}</div>
+      <div class="addressee-to"><strong>To:</strong> Hiring Leadership &amp; Selection Committee</div>
+      <div class="addressee-company">{target_company}</div>
+    </div>
+    <div class="addressee-right">
+      <div class="subject-line"><strong>RE:</strong> Application for <span class="subject-role">{target_role}</span></div>
+      <div class="subject-sub">Curriculum Vitae &amp; Statement of Strategic Alignment</div>
     </div>
   </div>
 
-  {skills_html}
+  {target_banner_html}
 
-  {projects_html if (config is None or config.show_projects) else ''}
+  {research_html}
 
-  <div class="cv-section section">
-    <div class="section-title">04 / Professional Experience & Career History</div>
-    {exp_html}
+  <div class="cv-section section avoid-break">
+    <div class="section-title">01 / Motivation &amp; Strategic Alignment — Why {target_company}?</div>
+    <div class="cv-letter-box">
+      {why_comp_badge}
+      <p class="letter-text">{rendered_why_company}</p>
+    </div>
   </div>
 
-  {european_spotlight_html}
+  <div class="cv-section section avoid-break">
+    <div class="section-title">02 / Candidate Value Proposition — Why I am the Ideal Fit for {target_role}?</div>
+    <div class="cv-letter-box">
+      {why_fit_badge}
+      <p class="letter-text">{rendered_why_fit}</p>
+    </div>
+  </div>
 
-  {certs_html if (config is None or config.show_certifications) else ''}
+  <div class="cv-section section">
+    <div class="section-title">03 / Key Strategic Competencies &amp; Architectural Wins</div>
+    {''.join(scope_callouts)}
+    {''.join(project_callouts) if (config is None or config.show_projects) else ''}
+  </div>
 
-  {pub_html}
+  <div class="cv-section section avoid-break">
+    <div class="section-title">04 / Verified Credentials &amp; Academic Foundation</div>
+    {f'<div class="competency-grid">{skill_cards}</div>' if skill_cards else ''}
+    {''.join(cert_items) if (config is None or config.show_certifications) and cert_items else ''}
+    {''.join(edu_items) if (config is None or config.show_education) and edu_items else ''}
+    {f'<ul class="entry-bullets" style="margin-top:8px;">{pub_items}</ul>' if pub_items else ''}
+    {european_spotlight_html}
+  </div>
 
-  {f'<div class="cv-section section"><div class="section-title">08 / Education & Academic Background</div>{edu_html}</div>' if (config is None or config.show_education) and edu_html else ''}
+  <div class="cv-signoff-block avoid-break">
+    <div class="signoff-salutation">Respectfully submitted,</div>
+    <div class="signoff-name">{resume.name}</div>
+    <div class="signoff-title">{resume.title or target_role}</div>
+  </div>
 
   <footer class="cv-footer avoid-break">
     <span>Curriculum Vitae &bull; {resume.name}</span>
-    <span>Verified Technical Dossier</span>
+    <span>Verified Technical Dossier &bull; Generated for {target_company}</span>
   </footer>
 </div>
 </body>

@@ -67,6 +67,9 @@ class ResumeData(BaseModel):
     document_type: Literal["resume", "cv"] = "resume"
     target_role: Optional[str] = None
     target_company: Optional[str] = None
+    why_company: Optional[str] = ""
+    why_fit: Optional[str] = ""
+    company_research: Optional[Dict[str, Any]] = None
     raw_text: Optional[str] = ""
     additional_sections: Dict[str, Any] = Field(default_factory=dict)
 

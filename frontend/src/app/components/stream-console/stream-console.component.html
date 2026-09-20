@@ -49,22 +49,31 @@
 
     <div class="flex-1 h-px bg-slate-800 mx-2 min-w-[12px]"></div>
 
+    @if (documentMode() === 'cv') {
+      <div class="flex items-center gap-1.5 shrink-0" [ngClass]="{'text-sky-400 font-bold': currentStep() === 'research', 'text-emerald-400': isPast('research'), 'text-slate-500': currentStep() !== 'research' && !isPast('research')}">
+        <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px]" [ngClass]="isPast('research') ? 'bg-emerald-600 text-white' : (currentStep() === 'research' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400')">2</span>
+        <span>Web Research</span>
+      </div>
+
+      <div class="flex-1 h-px bg-slate-800 mx-2 min-w-[12px]"></div>
+    }
+
     <div class="flex items-center gap-1.5 shrink-0" [ngClass]="{'text-sky-400 font-bold': currentStep() === 'audit', 'text-emerald-400': isPast('audit'), 'text-slate-500': currentStep() !== 'audit' && !isPast('audit')}">
-      <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px]" [ngClass]="isPast('audit') ? 'bg-emerald-600 text-white' : (currentStep() === 'audit' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400')">2</span>
+      <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px]" [ngClass]="isPast('audit') ? 'bg-emerald-600 text-white' : (currentStep() === 'audit' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400')">{{ documentMode() === 'cv' ? '3' : '2' }}</span>
       <span>Truth Audit</span>
     </div>
 
     <div class="flex-1 h-px bg-slate-800 mx-2 min-w-[12px]"></div>
 
     <div class="flex items-center gap-1.5 shrink-0" [ngClass]="{'text-sky-400 font-bold': currentStep() === 'synthesis', 'text-emerald-400': isPast('synthesis'), 'text-slate-500': currentStep() !== 'synthesis' && !isPast('synthesis')}">
-      <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px]" [ngClass]="isPast('synthesis') ? 'bg-emerald-600 text-white' : (currentStep() === 'synthesis' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400')">3</span>
+      <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px]" [ngClass]="isPast('synthesis') ? 'bg-emerald-600 text-white' : (currentStep() === 'synthesis' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400')">{{ documentMode() === 'cv' ? '4' : '3' }}</span>
       <span>Synthesis</span>
     </div>
 
     <div class="flex-1 h-px bg-slate-800 mx-2 min-w-[12px]"></div>
 
     <div class="flex items-center gap-1.5 shrink-0" [ngClass]="{'text-sky-400 font-bold': currentStep() === 'verification', 'text-emerald-400': isPast('verification'), 'text-slate-500': currentStep() !== 'verification' && !isPast('verification')}">
-      <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px]" [ngClass]="isPast('verification') ? 'bg-emerald-600 text-white' : (currentStep() === 'verification' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400')">4</span>
+      <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px]" [ngClass]="isPast('verification') ? 'bg-emerald-600 text-white' : (currentStep() === 'verification' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400')">{{ documentMode() === 'cv' ? '5' : '4' }}</span>
       <span>Guardrail</span>
     </div>
   </div>
@@ -83,6 +92,7 @@
           <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase mr-2"
             [ngClass]="{
               'bg-blue-500/20 text-blue-400': log.step === 'analysis',
+              'bg-teal-500/20 text-teal-300': log.step === 'research',
               'bg-amber-500/20 text-amber-400': log.step === 'audit',
               'bg-purple-500/20 text-purple-400': log.step === 'synthesis',
               'bg-emerald-500/20 text-emerald-400': log.step === 'verification'

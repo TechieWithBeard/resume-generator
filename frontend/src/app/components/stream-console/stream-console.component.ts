@@ -20,6 +20,7 @@ export class StreamConsoleComponent {
   readonly activeStreamingText = this.resumeService.activeStreamingText;
   readonly isStreaming = this.resumeService.isStreaming;
   readonly currentStep = this.resumeService.currentStep;
+  readonly documentMode = this.resumeService.documentMode;
   readonly auditReport = this.resumeService.auditReport;
   readonly isCollapsed = signal<boolean>(false);
 
@@ -48,6 +49,7 @@ export class StreamConsoleComponent {
   formatStep(step: string): string {
     const map: Record<string, string> = {
       analysis: 'Deconstruct',
+      research: 'Web Research',
       audit: 'Truth Audit',
       synthesis: 'Synthesize',
       verification: 'Guardrail',
@@ -56,7 +58,9 @@ export class StreamConsoleComponent {
   }
 
   isPast(step: string): boolean {
-    const order = ['analysis', 'audit', 'synthesis', 'verification', 'done'];
+    const order = this.documentMode() === 'cv'
+      ? ['analysis', 'research', 'audit', 'synthesis', 'verification', 'done']
+      : ['analysis', 'audit', 'synthesis', 'verification', 'done'];
     const currentIdx = order.indexOf(this.currentStep());
     const targetIdx = order.indexOf(step);
     return currentIdx > targetIdx;

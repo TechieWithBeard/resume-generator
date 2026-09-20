@@ -58,6 +58,9 @@ export interface ResumeData {
   document_type?: 'resume' | 'cv';
   target_role?: string;
   target_company?: string;
+  why_company?: string;
+  why_fit?: string;
+  company_research?: any;
   raw_text?: string;
   additional_sections?: Record<string, any>;
 }
@@ -102,7 +105,7 @@ export interface ThoughtLog {
   timestamp: string;
 }
 
-export type GeneratorStep = 'idle' | 'analysis' | 'audit' | 'synthesis' | 'verification' | 'done';
+export type GeneratorStep = 'idle' | 'analysis' | 'research' | 'audit' | 'synthesis' | 'verification' | 'done';
 
 export interface ResumeTemplate {
   id: string;
