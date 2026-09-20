@@ -224,6 +224,9 @@ export class ResumeGeneratorService {
 
   async saveTemplateConfig(cfg: TemplateConfig): Promise<void> {
     this.templateConfig.set(cfg);
+    if (cfg.template_id) {
+      this.selectedTemplate.set(cfg.template_id);
+    }
     localStorage.setItem('resume_template_config', JSON.stringify(cfg));
     try {
       await fetch(`${this.API_BASE}/api/template/config`, {
@@ -541,12 +544,40 @@ export class ResumeGeneratorService {
 
   // Export & Download Actions
   downloadPdf(): void {
-    const iframe = document.querySelector('iframe.resume-frame') as HTMLIFrameElement;
-    if (iframe && iframe.contentWindow) {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    } else {
-      window.print();
+    const html = this.renderedHtml();
+    if (!html) return;
+
+    // Create an isolated hidden iframe loaded exclusively with the resume HTML
+    // This ensures only the resume document is converted to PDF without web application UI bleed
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    printFrame.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow?.document;
+    if (frameDoc) {
+      frameDoc.open();
+      frameDoc.write(html);
+      frameDoc.close();
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow?.focus();
+          printFrame.contentWindow?.print();
+        } catch (err) {
+          console.error('Failed to invoke print on isolated iframe:', err);
+        } finally {
+          setTimeout(() => {
+            if (document.body.contains(printFrame)) {
+              document.body.removeChild(printFrame);
+            }
+          }, 2000);
+        }
+      }, 300);
     }
   }
 

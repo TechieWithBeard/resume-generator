@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ResumeGeneratorService } from '../../services/resume-generator.service';
@@ -35,6 +35,11 @@ export class TemplateConfigModalComponent {
   readonly draftConfig = signal<TemplateConfig>({ ...this.resumeService.templateConfig() });
   readonly previewHtml = signal<string>('');
   readonly isUpdatingPreview = signal<boolean>(false);
+  readonly showCustomCss = signal<boolean>(false);
+
+  private prevIsOpen = false;
+  private renderRequestId = 0;
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly colorPalettes: ColorPalette[] = [
     { name: 'Sapphire Tech', primary: '#0284c7', accent: '#0369a1', text: '#0f172a', badgeBg: '#0284c7' },
@@ -54,58 +59,104 @@ export class TemplateConfigModalComponent {
   ];
 
   constructor() {
-    // When modal opens, sync draftConfig from active service config and render live preview
+    // Detect modal opening rising edge; use untracked so user edits don't trigger re-initialization
     effect(() => {
-      if (this.isOpen()) {
-        this.draftConfig.set({ ...this.resumeService.templateConfig() });
-        this.refreshPreview();
+      const open = this.isOpen();
+      if (open && !this.prevIsOpen) {
+        const svcConfig = this.resumeService.templateConfig();
+        const activeTmpl = this.resumeService.selectedTemplate();
+        const initial: TemplateConfig = {
+          ...svcConfig,
+          template_id: activeTmpl || svcConfig.template_id || 'modern',
+        };
+        untracked(() => {
+          this.draftConfig.set(initial);
+          this.refreshPreview(0);
+        });
       }
+      this.prevIsOpen = open;
     });
   }
 
-  async selectPalette(palette: ColorPalette): Promise<void> {
+  updateField<K extends keyof TemplateConfig>(field: K, value: TemplateConfig[K], debounceMs = 120): void {
+    this.draftConfig.update((cfg) => ({ ...cfg, [field]: value }));
+    this.refreshPreview(debounceMs);
+  }
+
+  selectPalette(palette: ColorPalette): void {
     this.draftConfig.update((cfg) => ({
       ...cfg,
       primary_color: palette.primary,
       accent_color: palette.accent,
       text_color: palette.text,
     }));
-    await this.refreshPreview();
+    this.refreshPreview(0);
   }
 
-  async onConfigChange(): Promise<void> {
-    this.draftConfig.update((c) => ({ ...c }));
-    await this.refreshPreview();
+  onSelectTemplate(tmplId: string): void {
+    this.updateField('template_id', tmplId, 0);
   }
 
-  async onSelectTemplate(tmplId: string): Promise<void> {
-    this.draftConfig.update((cfg) => ({ ...cfg, template_id: tmplId }));
-    await this.refreshPreview();
+  refreshPreview(debounceMs = 0): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+
+    const run = async () => {
+      let resume = this.resumeService.activeResume();
+      if (!resume) {
+        await this.resumeService.loadBaseResume();
+        resume = this.resumeService.activeResume();
+      }
+      if (!resume) {
+        this.isUpdatingPreview.set(false);
+        return;
+      }
+
+      this.isUpdatingPreview.set(true);
+      const reqId = ++this.renderRequestId;
+      const cfg = this.draftConfig();
+      const tmplId = cfg.template_id || this.resumeService.selectedTemplate() || 'modern';
+
+      try {
+        const html = await this.resumeService.renderPreviewWithConfig(resume, tmplId, cfg);
+        if (reqId === this.renderRequestId) {
+          this.previewHtml.set(html);
+        }
+      } catch (err) {
+        console.error('Failed to render template customizer preview:', err);
+      } finally {
+        if (reqId === this.renderRequestId) {
+          this.isUpdatingPreview.set(false);
+        }
+      }
+    };
+
+    if (debounceMs <= 0) {
+      run();
+    } else {
+      this.debounceTimer = setTimeout(run, debounceMs);
+    }
   }
 
-  async refreshPreview(): Promise<void> {
-    const resume = this.resumeService.activeResume();
-    if (!resume) return;
-
-    this.isUpdatingPreview.set(true);
-    const cfg = this.draftConfig();
-    const html = await this.resumeService.renderPreviewWithConfig(resume, cfg.template_id, cfg);
-    this.previewHtml.set(html);
-    this.isUpdatingPreview.set(false);
-  }
-
-  async onResetDefaults(): Promise<void> {
+  onResetDefaults(): void {
     const defaults = { ...this.resumeService.defaultTemplateConfig };
     this.draftConfig.set(defaults);
-    await this.refreshPreview();
+    this.refreshPreview(0);
   }
 
   async onSave(): Promise<void> {
-    await this.resumeService.saveTemplateConfig(this.draftConfig());
+    const finalConfig = this.draftConfig();
+    await this.resumeService.saveTemplateConfig(finalConfig);
     this.close();
   }
 
   close(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
     this.resumeService.showTemplateConfigModal.set(false);
   }
 }

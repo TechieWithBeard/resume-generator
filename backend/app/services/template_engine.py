@@ -71,14 +71,24 @@ class TemplateEngine:
         header_css = ""
         if config.header_layout == "center":
             header_css = """
-            .header { text-align: center !important; }
-            .contacts { justify-content: center !important; text-align: center !important; display: flex !important; flex-wrap: wrap !important; }
+            .header { text-align: center !important; display: block !important; }
+            .name, h1 { text-align: center !important; }
+            .contacts { justify-content: center !important; text-align: center !important; display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
             .title-tagline { text-align: center !important; }
             """
         elif config.header_layout == "split":
             header_css = """
-            .header { display: flex !important; justify-content: space-between !important; align-items: flex-end !important; flex-wrap: wrap !important; gap: 12px !important; }
-            .contacts { text-align: right !important; }
+            .header { display: flex !important; justify-content: space-between !important; align-items: flex-end !important; flex-wrap: wrap !important; gap: 12px !important; text-align: left !important; }
+            .name, h1 { text-align: left !important; }
+            .contacts { text-align: right !important; justify-content: flex-end !important; display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
+            .title-tagline { text-align: left !important; }
+            """
+        elif config.header_layout == "left":
+            header_css = """
+            .header { text-align: left !important; display: block !important; }
+            .name, h1 { text-align: left !important; }
+            .contacts { justify-content: flex-start !important; text-align: left !important; display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
+            .title-tagline { text-align: left !important; }
             """
 
         return f"""
@@ -91,14 +101,53 @@ class TemplateEngine:
             --font-size: {config.font_size} !important;
             --line-height: {line_height} !important;
         }}
-        body {{
+        body, body * {{
             font-family: var(--font-family) !important;
+        }}
+        pre, code, .diff-sign, .font-mono, [class*="mono"] {{
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+        }}
+        body {{
+            color: var(--text-primary) !important;
+            line-height: var(--line-height) !important;
+        }}
+        body, p, li, .summary-text, .exp-highlights, .project-highlights, .contacts, .exp-period, .edu-item, .edu-period, .skill-badge {{
             font-size: var(--font-size) !important;
             line-height: var(--line-height) !important;
-            color: var(--text-primary) !important;
         }}
-        .resume-paper {{
-            padding: {padding} !important;
+        .name, h1, .sec-heading, .section-title, .cv-section-title, .cv-section-title-alt, .cv-project-title, .exp-role, .project-name {{
+            color: var(--primary-color) !important;
+        }}
+        .header, .sec-heading, .section-title, .cv-section-title {{
+            border-bottom-color: var(--accent-color) !important;
+        }}
+        .title-tagline, .title, .exp-company, .cv-project-role, .edu-degree, .target-company, .skill-label {{
+            color: var(--accent-color) !important;
+        }}
+        a, .contacts a {{
+            color: var(--primary-color) !important;
+        }}
+        .cv-badge, .badge, .tag-primary {{
+            background-color: var(--primary-color) !important;
+            color: #ffffff !important;
+        }}
+        @media screen {{
+            .resume-paper, .paper {{
+                padding: {padding} !important;
+            }}
+        }}
+        @media print {{
+            body {{
+                background: #ffffff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }}
+            .resume-paper, .paper {{
+                padding: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                max-width: 100% !important;
+            }}
         }}
         .section, .cv-section {{
             margin-bottom: {section_margin} !important;
@@ -244,12 +293,16 @@ class TemplateEngine:
 
         doc_type = getattr(resume, "document_type", "resume")
         effective_tmpl = (config.template_id if config and config.template_id else template_id)
-        if effective_tmpl == "cv_executive" or (doc_type == "cv" and effective_tmpl in ("modern", "default")):
+        if effective_tmpl == "cv_executive":
             return self._render_cv_executive(resume, highlight_diff, base_resume, config=config)
         elif effective_tmpl == "executive":
             return self._render_executive(resume, highlight_diff, base_resume, config=config)
         elif effective_tmpl == "compact":
             return self._render_compact(resume, highlight_diff, base_resume, config=config)
+        elif effective_tmpl == "modern":
+            return self._render_modern(resume, highlight_diff, base_resume, config=config)
+        elif doc_type == "cv":
+            return self._render_cv_executive(resume, highlight_diff, base_resume, config=config)
         else:
             return self._render_modern(resume, highlight_diff, base_resume, config=config)
 
@@ -1067,17 +1120,23 @@ class TemplateEngine:
                 p_key = b_proj.name.strip().lower()
                 base_projects_by_name[p_key] = b_proj.description
 
+        use_icons = config.show_icons if config is not None else True
         contacts = []
         if resume.email:
-            contacts.append(f'<span class="contact-item">✉ {resume.email}</span>')
+            icon = "✉ " if use_icons else ""
+            contacts.append(f'<span class="contact-item">{icon}{resume.email}</span>')
         if resume.phone:
-            contacts.append(f'<span class="contact-item">☎ {resume.phone}</span>')
+            icon = "☎ " if use_icons else ""
+            contacts.append(f'<span class="contact-item">{icon}{resume.phone}</span>')
         if resume.location:
-            contacts.append(f'<span class="contact-item">📍 {resume.location}</span>')
+            icon = "📍 " if use_icons else ""
+            contacts.append(f'<span class="contact-item">{icon}{resume.location}</span>')
         if resume.linkedin:
-            contacts.append(f'<a href="{resume.linkedin}" target="_blank" class="contact-item">🔗 LinkedIn</a>')
+            icon = "🔗 " if use_icons else ""
+            contacts.append(f'<a href="{resume.linkedin}" target="_blank" class="contact-item">{icon}LinkedIn</a>')
         if resume.github:
-            contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item">💻 GitHub</a>')
+            icon = "💻 " if use_icons else ""
+            contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item">{icon}GitHub</a>')
         contact_html = " &bull; ".join(contacts)
 
         # Target Alignment Callout Banner

@@ -205,7 +205,7 @@
         >
           <iframe
             #resumeIframe
-            class="w-full h-full min-h-[860px] bg-white rounded-lg shadow-xl border-0"
+            class="resume-frame w-full h-full min-h-[860px] bg-white rounded-lg shadow-xl border-0"
             title="Resume Live Preview"
             [srcdoc]="renderedHtml()"
           ></iframe>
@@ -237,7 +237,7 @@
           >
             @if (baseRenderedHtml()) {
               <iframe
-                class="w-full h-full min-h-[820px] bg-white border-0"
+                class="resume-frame base-resume-frame w-full h-full min-h-[820px] bg-white border-0"
                 title="Base Resume Source of Truth"
                 [srcdoc]="baseRenderedHtml()"
               ></iframe>
@@ -267,7 +267,7 @@
           >
             @if (renderedHtml()) {
               <iframe
-                class="w-full h-full min-h-[820px] bg-white border-0"
+                class="resume-frame tailored-resume-frame w-full h-full min-h-[820px] bg-white border-0"
                 title="Tailored Resume with Diff Highlighting"
                 [srcdoc]="renderedHtml()"
               ></iframe>
