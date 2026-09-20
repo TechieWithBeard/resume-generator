@@ -168,3 +168,32 @@ During testing with concise job specifications (e.g. `Senior Frontend Developer 
 - **Positive**: Zero dead pauses or frozen screens during LLM reasoning.
 - **Positive**: High match scores and tailored summaries even for single-line job inputs.
 - **Positive**: Transparent visibility into AI decision-making.
+
+---
+
+## ADR-007: Multi-Format Document Ingestion & Schema-Constrained Extraction for Candidate Ground Truth
+
+### Status
+Accepted
+
+### Context
+Users require the ability to upload their existing resume (PDF, Word DOCX, Plain Text, Markdown, or JSON) to automatically populate and update their Source of Truth Base Resume, rather than manually re-typing employment history, dates, degrees, and skills. The extraction pipeline must reliably handle unstructured documents, extract full metadata, and operate even when offline without external API keys.
+
+### Decision
+1. **Multi-Format Ingestion Engine (`ResumeParserService`)**:
+   - **PDF** (`.pdf`): Extract text streams with `pypdf.PdfReader` across all document pages.
+   - **Word Documents** (`.docx`): Extract paragraph nodes from `word/document.xml` using `zipfile` and `xml.etree.ElementTree` without brittle external C-dependencies.
+   - **Plain Text / Markdown** (`.txt`, `.md`, `.rtf`): Decoded with UTF-8 and Latin-1 fallbacks.
+   - **JSON** (`.json`): Direct deserialization and Pydantic validation against `ResumeData`.
+2. **Dual-Engine Information Extraction**:
+   - **LLM Extraction Engine**: When Ollama or OpenAI is configured, dispatches a structured system prompt extracting the complete schema with categorized skills and bullet points.
+   - **Deterministic Heuristic NLP Fallback**: If LLM is unconfigured or unreachable, an intelligent regex and section-boundary parser extracts contact info, work history, institutions, and skills matrix deterministically with zero API keys.
+3. **Metadata Calculation**:
+   - Ingestion returns document metadata: format, word count, character count, page count, detected sections, and extraction method.
+4. **Interactive Review & Ground Truth Persistence**:
+   - Uploaded resumes populate the interactive form for user review and edits before saving to `data/my_resume.json` (decoupled from git).
+
+### Consequences
+- **Positive**: Effortless onboarding: users can upload their real PDF/DOCX resume in seconds.
+- **Positive**: Zero data loss or hallucination: extracted data is presented for user review.
+- **Positive**: 100% functional offline or online.

@@ -5,6 +5,8 @@ Engineered to run natively on Uvicorn with zero brittle external framework depen
 """
 
 import asyncio
+import base64
+import email
 import json
 import os
 import urllib.parse
@@ -19,6 +21,7 @@ from backend.app.models.resume import (
 )
 from backend.app.services.generator_chain import generator_chain
 from backend.app.services.linkedin_extractor import linkedin_extractor
+from backend.app.services.resume_parser import resume_parser
 from backend.app.services.resume_store import resume_store
 from backend.app.services.template_engine import template_engine
 
@@ -120,6 +123,78 @@ async def app(scope, receive, send):
     if path == "/api/resume/reset" and method == "POST":
         res_model = resume_store.reset_to_default()
         status, headers, body = send_json(res_model.model_dump())
+        await send({"type": "http.response.start", "status": status, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+        return
+
+    # Route: POST /api/resume/upload (Ingests PDF, DOCX, TXT, MD, JSON resumes)
+    if path == "/api/resume/upload" and method == "POST":
+        raw = await read_body(receive)
+        headers_dict = {k.lower(): v for k, v in scope.get("headers", [])}
+        ct = headers_dict.get(b"content-type", b"").decode("latin-1")
+
+        file_bytes = b""
+        filename = "uploaded_resume.txt"
+        auto_save = False
+
+        if "multipart/form-data" in ct:
+            try:
+                raw_header = f"Content-Type: {ct}\r\n\r\n".encode("latin-1")
+                msg = email.message_from_bytes(raw_header + raw)
+                for part in msg.walk():
+                    fn = part.get_filename()
+                    if fn:
+                        filename = fn
+                        file_bytes = part.get_payload(decode=True) or b""
+                        break
+                    if part.get_param("name", header="content-disposition") == "save":
+                        auto_save = (part.get_payload(decode=True) or b"").decode("utf-8").lower() in ("true", "1")
+            except Exception as e:
+                status, headers, body = send_json({"success": False, "error": f"Failed to parse multipart upload: {e}"}, status=400)
+                await send({"type": "http.response.start", "status": status, "headers": headers})
+                await send({"type": "http.response.body", "body": body})
+                return
+        else:
+            try:
+                data = json.loads(raw.decode("utf-8"))
+                filename = data.get("filename", "resume.txt")
+                auto_save = bool(data.get("save", False))
+                if "file_data" in data and data["file_data"]:
+                    b64_str = str(data["file_data"])
+                    if "," in b64_str:
+                        b64_str = b64_str.split(",", 1)[1]
+                    file_bytes = base64.b64decode(b64_str)
+                elif "raw_text" in data and data["raw_text"]:
+                    file_bytes = str(data["raw_text"]).encode("utf-8")
+            except Exception as e:
+                status, headers, body = send_json({"success": False, "error": f"Failed to decode upload payload: {e}"}, status=400)
+                await send({"type": "http.response.start", "status": status, "headers": headers})
+                await send({"type": "http.response.body", "body": body})
+                return
+
+        if not file_bytes:
+            status, headers, body = send_json({"success": False, "error": "No file content or data received."}, status=400)
+            await send({"type": "http.response.start", "status": status, "headers": headers})
+            await send({"type": "http.response.body", "body": body})
+            return
+
+        try:
+            parsed_resume, metadata = await resume_parser.parse_resume(file_bytes, filename)
+            if auto_save:
+                resume_store.save_base_resume(parsed_resume)
+                metadata["saved_as_base"] = True
+
+            status, headers, body = send_json({
+                "success": True,
+                "resume": parsed_resume.model_dump(),
+                "metadata": metadata,
+            })
+        except Exception as err:
+            status, headers, body = send_json({
+                "success": False,
+                "error": f"Extraction error: {str(err)}",
+            }, status=422)
+
         await send({"type": "http.response.start", "status": status, "headers": headers})
         await send({"type": "http.response.body", "body": body})
         return

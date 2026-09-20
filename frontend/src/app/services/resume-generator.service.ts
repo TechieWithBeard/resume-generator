@@ -103,6 +103,58 @@ export class ResumeGeneratorService {
     }
   }
 
+  async uploadResumeFile(
+    file: File,
+    autoSave: boolean = false
+  ): Promise<{ success: boolean; resume?: ResumeData; metadata?: any; error?: string }> {
+    try {
+      const base64Content = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+      });
+
+      const payload = {
+        filename: file.name,
+        file_data: base64Content,
+        save: autoSave,
+      };
+
+      const res = await fetch(`${this.API_BASE}/api/resume/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (autoSave && data.resume) {
+          this.baseResume.set(data.resume);
+          if (!this.tailoredResume()) {
+            await this.renderResume(data.resume, this.selectedTemplate(), false);
+          }
+        }
+        return {
+          success: true,
+          resume: data.resume,
+          metadata: data.metadata,
+        };
+      } else {
+        return {
+          success: false,
+          error: data.error || 'Failed to extract resume content.',
+        };
+      }
+    } catch (err: any) {
+      console.error('Resume upload error:', err);
+      return {
+        success: false,
+        error: err.message || 'Network error uploading resume file.',
+      };
+    }
+  }
+
   async loadTemplates(): Promise<void> {
     try {
       const res = await fetch(`${this.API_BASE}/api/templates`);
