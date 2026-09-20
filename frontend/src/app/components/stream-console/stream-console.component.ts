@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, effect, inject } from '@angular/core';
+import { Component, ElementRef, ViewChild, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ResumeGeneratorService } from '../../services/resume-generator.service';
 import { CardComponent } from '../../shared/components/card/card.component';
@@ -21,8 +21,15 @@ export class StreamConsoleComponent {
   readonly isStreaming = this.resumeService.isStreaming;
   readonly currentStep = this.resumeService.currentStep;
   readonly auditReport = this.resumeService.auditReport;
+  readonly isCollapsed = signal<boolean>(false);
 
   constructor() {
+    effect(() => {
+      if (this.isStreaming()) {
+        this.isCollapsed.set(false);
+      }
+    });
+
     effect(() => {
       this.logs();
       this.activeStreamingText();
@@ -32,6 +39,10 @@ export class StreamConsoleComponent {
         }
       }, 30);
     });
+  }
+
+  toggleCollapse(): void {
+    this.isCollapsed.update((c) => !c);
   }
 
   formatStep(step: string): string {

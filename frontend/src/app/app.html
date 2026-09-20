@@ -1,17 +1,27 @@
 <div class="min-h-screen flex flex-col bg-slate-100 font-sans">
-  <!-- Reusable Top Header -->
-  <app-header></app-header>
+  <!-- Reusable Top Header (hidden in fullscreen) -->
+  @if (!isFullscreen()) {
+    <app-header></app-header>
+  }
 
   <!-- Main Split-Screen Workspace -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Left Column: Inputs & Real-Time Decision Stream -->
-    <div class="flex flex-col gap-6">
-      <app-job-input></app-job-input>
-      <app-stream-console></app-stream-console>
-    </div>
+  <main
+    class="flex-1 w-full mx-auto transition-all duration-200"
+    [ngClass]="isFullscreen() ? 'p-2 sm:p-3 flex flex-col h-screen' : 'max-w-[1720px] p-4 sm:p-5 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6'"
+  >
+    <!-- Left Column: Inputs & Real-Time Decision Stream (hidden in fullscreen) -->
+    @if (!isFullscreen()) {
+      <div class="lg:col-span-5 xl:col-span-4 flex flex-col gap-6">
+        <app-job-input></app-job-input>
+        <app-stream-console></app-stream-console>
+      </div>
+    }
 
-    <!-- Right Column: Live Interactive Resume Preview & Export -->
-    <div class="flex flex-col">
+    <!-- Right Column: Live Interactive Preview & Export -->
+    <div
+      class="flex flex-col h-full"
+      [ngClass]="isFullscreen() ? 'w-full flex-1' : 'lg:col-span-7 xl:col-span-8'"
+    >
       <app-resume-preview></app-resume-preview>
     </div>
   </main>

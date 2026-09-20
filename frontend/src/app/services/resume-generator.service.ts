@@ -37,6 +37,10 @@ export class ResumeGeneratorService {
   readonly selectedTemplate = signal<string>('modern');
   readonly documentMode = signal<'resume' | 'cv'>('resume');
   readonly comparisonMode = signal<boolean>(false);
+  readonly viewMode = signal<'single' | 'split'>('single');
+  readonly baseRenderedHtml = signal<string>('');
+  readonly isFullscreen = signal<boolean>(false);
+  readonly previewZoom = signal<number>(100);
 
   readonly defaultTemplateConfig: TemplateConfig = {
     template_id: 'modern',
@@ -96,6 +100,7 @@ export class ResumeGeneratorService {
       if (res.ok) {
         const data: ResumeData = await res.json();
         this.baseResume.set(data);
+        await this.renderBaseResume();
         if (!this.tailoredResume()) {
           await this.renderResume(data, this.selectedTemplate(), false);
         }
@@ -279,10 +284,67 @@ export class ResumeGeneratorService {
     }
   }
 
+  async renderBaseResume(): Promise<string> {
+    const base = this.baseResume();
+    if (!base) return '';
+    try {
+      const res = await fetch(`${this.API_BASE}/api/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resume: base,
+          template_id: this.selectedTemplate(),
+          highlight_diff: false,
+          base_resume: null,
+          template_config: this.templateConfig(),
+        }),
+      });
+      if (res.ok) {
+        const html = await res.text();
+        this.baseRenderedHtml.set(html);
+        return html;
+      }
+    } catch (err) {
+      console.error('Failed to render base resume:', err);
+    }
+    return '';
+  }
+
+  async setViewMode(mode: 'single' | 'split'): Promise<void> {
+    this.viewMode.set(mode);
+    if (mode === 'split') {
+      await this.renderBaseResume();
+      this.comparisonMode.set(true);
+      const tailored = this.tailoredResume();
+      if (tailored) {
+        await this.renderResume(tailored, this.selectedTemplate(), true);
+      }
+    }
+  }
+
+  zoomIn(): void {
+    this.previewZoom.update((z) => Math.min(140, z + 10));
+  }
+
+  zoomOut(): void {
+    this.previewZoom.update((z) => Math.max(65, z - 10));
+  }
+
+  resetZoom(): void {
+    this.previewZoom.set(100);
+  }
+
+  toggleFullscreen(): void {
+    this.isFullscreen.update((f) => !f);
+  }
+
   async selectTemplate(templateId: string): Promise<void> {
     this.selectedTemplate.set(templateId);
     const cfg = { ...this.templateConfig(), template_id: templateId };
     this.templateConfig.set(cfg);
+    if (this.viewMode() === 'split') {
+      await this.renderBaseResume();
+    }
     const active = this.activeResume();
     if (active) {
       await this.renderResume(active, templateId, this.comparisonMode());
@@ -295,6 +357,9 @@ export class ResumeGeneratorService {
       this.selectedTemplate.set('cv_executive');
     } else if (mode === 'resume' && this.selectedTemplate() === 'cv_executive') {
       this.selectedTemplate.set('modern');
+    }
+    if (this.viewMode() === 'split') {
+      await this.renderBaseResume();
     }
     const active = this.activeResume();
     if (active) {

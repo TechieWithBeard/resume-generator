@@ -1,84 +1,151 @@
 <app-card [shadow]="true" class="h-full flex flex-col">
   <!-- Toolbar in card-header -->
-  <div card-header class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-    <!-- Left: Template Switcher & Mode Badge -->
-    <div class="flex items-center gap-3">
+  <div card-header class="p-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+    <!-- Left Section: View Mode & Document/Template Selector -->
+    <div class="flex flex-wrap items-center gap-2.5">
+      <!-- Segmented View Mode Switcher -->
+      <div class="inline-flex bg-slate-200/90 p-1 rounded-xl border border-slate-300/80 shadow-inner">
+        <button
+          type="button"
+          class="px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all duration-150 cursor-pointer"
+          [ngClass]="viewMode() === 'single' ? 'bg-white text-sky-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
+          (click)="onSetViewMode('single')"
+          title="Standard single document view"
+        >
+          <span>📄</span>
+          <span>Single</span>
+        </button>
+        <button
+          type="button"
+          class="px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all duration-150 cursor-pointer"
+          [ngClass]="viewMode() === 'split' ? 'bg-white text-indigo-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
+          (click)="onSetViewMode('split')"
+          title="Side-by-side comparison between Ground Truth Base Profile and Tailored Document"
+        >
+          <span>⚖️</span>
+          <span>Side-by-Side Diff</span>
+        </button>
+      </div>
+
+      <!-- Mode Badge -->
       @if (documentMode() === 'cv') {
-        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 shadow-sm">
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm">
           <span>📜</span>
           <span>Executive CV</span>
         </span>
       } @else {
-        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200 shadow-sm">
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 shadow-sm">
           <span>📄</span>
           <span>Targeted Resume</span>
         </span>
       }
-      <span class="text-xs font-bold text-slate-800">Template:</span>
-      <div class="inline-flex bg-slate-200/80 p-1 rounded-lg">
-        @for (tmpl of templates(); track tmpl.id) {
-          <button
-            type="button"
-            class="px-2.5 py-1 text-xs font-semibold rounded-md transition-all duration-150"
-            [ngClass]="selectedTemplate() === tmpl.id ? 'bg-white text-sky-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
-            (click)="onSelectTemplate(tmpl.id)"
-            [title]="tmpl.description"
-          >
-            {{ tmpl.name }}
-          </button>
-        }
+
+      <!-- Compact Template Selector -->
+      <div class="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-sm">
+        <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Template:</span>
+        <select
+          [value]="selectedTemplate()"
+          (change)="onSelectTemplate($any($event.target).value)"
+          class="text-xs font-semibold bg-transparent text-slate-800 focus:outline-none cursor-pointer pr-1"
+        >
+          @for (tmpl of templates(); track tmpl.id) {
+            <option [value]="tmpl.id">{{ tmpl.name }}</option>
+          }
+        </select>
       </div>
 
+      <!-- Customize Button -->
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-sm transition-all"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-sm transition-all cursor-pointer"
         (click)="onOpenTemplateStudio()"
         title="Customize template colors, typography, density, and section visibility"
       >
         <span>🎨</span>
-        <span>Customize</span>
+        <span>Styling</span>
       </button>
     </div>
 
+    <!-- Right Section: Diff Toggle, Zoom, Fullscreen & Export Buttons -->
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Diff Highlight Toggle (active in single view) -->
+      @if (viewMode() === 'single') {
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 shadow-sm cursor-pointer"
+          [ngClass]="comparisonMode() ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+          (click)="onToggleDiff()"
+          title="Highlight tailored modifications, keyword matches, and adapted achievements"
+        >
+          <span>🔍</span>
+          <span>{{ comparisonMode() ? 'Diff Highlights On' : 'Highlight Changes' }}</span>
+        </button>
+      }
 
-    <!-- Right: Actions -->
-    <div class="flex items-center gap-2">
-      <!-- Diff Highlight Toggle -->
+      <!-- Zoom Controls -->
+      <div class="inline-flex items-center bg-white border border-slate-300 rounded-lg shadow-sm text-xs overflow-hidden">
+        <button
+          type="button"
+          class="px-2 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-bold transition-all cursor-pointer border-r border-slate-200"
+          (click)="onZoomOut()"
+          title="Zoom out"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          class="px-2.5 py-1.5 text-[11px] font-mono font-semibold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer border-r border-slate-200"
+          (click)="onResetZoom()"
+          title="Reset zoom to 100%"
+        >
+          {{ previewZoom() }}%
+        </button>
+        <button
+          type="button"
+          class="px-2 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-bold transition-all cursor-pointer"
+          (click)="onZoomIn()"
+          title="Zoom in"
+        >
+          +
+        </button>
+      </div>
+
+      <!-- Fullscreen Toggle -->
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 shadow-sm"
-        [ngClass]="comparisonMode() ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
-        (click)="onToggleDiff()"
-        title="Highlight tailored modifications and emphasized achievements"
+        class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 shadow-sm cursor-pointer"
+        [ngClass]="isFullscreen() ? 'bg-sky-50 text-sky-700 border-sky-300 font-bold' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+        (click)="onToggleFullscreen()"
+        [title]="isFullscreen() ? 'Exit Fullscreen' : 'Enter Fullscreen Workspace'"
       >
-        <span>🔍</span>
-        <span>{{ comparisonMode() ? 'Diff View Active' : 'Highlight Changes' }}</span>
+        <span>{{ isFullscreen() ? '⛷ Exit' : '⛶ Fullscreen' }}</span>
       </button>
 
-      <!-- Download PDF -->
+      <!-- Divider -->
+      <div class="h-5 w-px bg-slate-300 mx-0.5"></div>
+
+      <!-- Export Actions -->
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition-all duration-150 shadow-sm shadow-sky-600/20"
+        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition-all duration-150 shadow-sm shadow-sky-600/20 cursor-pointer"
         (click)="onDownloadPdf()"
         title="Export as vector PDF via browser print"
       >
         <span>🖨️</span> PDF
       </button>
 
-      <!-- Download HTML -->
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold transition-all duration-150 shadow-sm"
+        class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold transition-all duration-150 shadow-sm cursor-pointer"
         (click)="onDownloadHtml()"
         title="Download standalone ATS HTML file"
       >
         <span>🌐</span> HTML
       </button>
 
-      <!-- Download JSON -->
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold transition-all duration-150 shadow-sm"
+        class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold transition-all duration-150 shadow-sm cursor-pointer"
         (click)="onDownloadJson()"
         title="Download raw resume JSON"
       >
@@ -87,20 +154,121 @@
     </div>
   </div>
 
-  <!-- Preview Frame -->
-  <div class="p-4 bg-slate-200/80 flex-1 flex justify-center items-start min-h-[720px] overflow-auto">
-    @if (renderedHtml()) {
-      <iframe
-        #resumeIframe
-        class="w-full h-full min-h-[820px] bg-white rounded-lg shadow-lg border-0"
-        title="Resume Live Preview"
-        [srcdoc]="renderedHtml()"
-      ></iframe>
-    } @else {
-      <div class="m-auto text-center py-20 text-slate-400">
-        <div class="text-4xl mb-2">📄</div>
-        <div class="text-sm font-medium">Loading Base Resume (Source of Truth)...</div>
+  <!-- Split Comparison Info Banner (active when split mode is selected) -->
+  @if (viewMode() === 'split') {
+    <div class="px-4 py-2.5 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white border-b border-slate-700 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div class="flex items-center gap-3">
+        <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold uppercase text-[10px] tracking-wider">
+          ⚖️ Side-by-Side Diff Audit
+        </span>
+        @if (auditReport()?.target_role) {
+          <span class="font-semibold text-slate-200">
+            Target Alignment: <strong class="text-sky-300">{{ auditReport()?.target_role }}</strong>
+          </span>
+        }
       </div>
-    }
-  </div>
+      <div class="flex items-center gap-4 text-[11px]">
+        @if (auditReport()) {
+          <span class="text-slate-300">
+            Match Score: <strong class="text-emerald-400 font-mono">{{ auditReport()?.match_score }}%</strong>
+          </span>
+          <span class="text-slate-300">
+            Direct Matches: <strong class="text-sky-400 font-mono">{{ auditReport()?.direct_matches?.length || 0 }}</strong>
+          </span>
+        }
+        <span class="text-emerald-400 flex items-center gap-1 font-semibold">
+          <span>🛡️</span> Zero-Hallucination Invariant Verified
+        </span>
+      </div>
+    </div>
+  }
+
+  <!-- Preview Area -->
+  @if (viewMode() === 'single') {
+    <!-- Single Document Preview -->
+    <div class="p-4 sm:p-6 bg-slate-200/80 flex-1 flex justify-center items-start min-h-[720px] overflow-auto">
+      @if (renderedHtml()) {
+        <div
+          class="w-full flex justify-center"
+          [style.transform]="previewZoom() !== 100 ? 'scale(' + (previewZoom() / 100) + ')' : null"
+          style="transform-origin: top center; transition: transform 0.15s ease-out;"
+        >
+          <iframe
+            #resumeIframe
+            class="w-full h-full min-h-[860px] bg-white rounded-lg shadow-xl border-0"
+            title="Resume Live Preview"
+            [srcdoc]="renderedHtml()"
+          ></iframe>
+        </div>
+      } @else {
+        <div class="m-auto text-center py-20 text-slate-400">
+          <div class="text-4xl mb-2">📄</div>
+          <div class="text-sm font-medium">Loading Base Resume (Source of Truth)...</div>
+        </div>
+      }
+    </div>
+  } @else {
+    <!-- Side-by-Side Split Diff Comparison View -->
+    <div class="p-3 sm:p-4 bg-slate-200/90 flex-1 overflow-auto">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full min-h-[780px]">
+        <!-- Left Column: Base Resume (Source of Truth) -->
+        <div class="flex flex-col bg-white rounded-xl shadow-md border border-slate-300/80 overflow-hidden">
+          <div class="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+              <span class="font-bold text-slate-700 uppercase tracking-wide">Base Profile (Source of Truth)</span>
+            </div>
+            <span class="text-[10px] font-medium text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded">Unmodified Ground Truth</span>
+          </div>
+          <div
+            class="flex-1 p-2 overflow-auto flex justify-center items-start"
+            [style.transform]="previewZoom() !== 100 ? 'scale(' + (previewZoom() / 100) + ')' : null"
+            style="transform-origin: top center; transition: transform 0.15s ease-out;"
+          >
+            @if (baseRenderedHtml()) {
+              <iframe
+                class="w-full h-full min-h-[820px] bg-white border-0"
+                title="Base Resume Source of Truth"
+                [srcdoc]="baseRenderedHtml()"
+              ></iframe>
+            } @else {
+              <div class="m-auto text-center py-20 text-slate-400 text-xs">
+                Base resume rendering...
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Right Column: Tailored Resume / CV with Diff Highlighting -->
+        <div class="flex flex-col bg-white rounded-xl shadow-md border border-sky-300/80 overflow-hidden">
+          <div class="px-4 py-2.5 bg-sky-50 border-b border-sky-200 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span class="font-bold text-sky-900 uppercase tracking-wide">Tailored Target Alignment</span>
+            </div>
+            <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded">
+              🔍 Diff Highlighting Active
+            </span>
+          </div>
+          <div
+            class="flex-1 p-2 overflow-auto flex justify-center items-start"
+            [style.transform]="previewZoom() !== 100 ? 'scale(' + (previewZoom() / 100) + ')' : null"
+            style="transform-origin: top center; transition: transform 0.15s ease-out;"
+          >
+            @if (renderedHtml()) {
+              <iframe
+                class="w-full h-full min-h-[820px] bg-white border-0"
+                title="Tailored Resume with Diff Highlighting"
+                [srcdoc]="renderedHtml()"
+              ></iframe>
+            } @else {
+              <div class="m-auto text-center py-20 text-slate-400 text-xs">
+                Tailored resume rendering...
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
 </app-card>

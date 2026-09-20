@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ResumeGeneratorService } from './services/resume-generator.service';
 import { HeaderComponent } from './components/header/header.component';
 import { JobInputComponent } from './components/job-input/job-input.component';
 import { StreamConsoleComponent } from './components/stream-console/stream-console.component';
@@ -24,4 +25,8 @@ import { TemplateConfigModalComponent } from './components/template-config-modal
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
-export class App {}
+export class App {
+  private readonly resumeService = inject(ResumeGeneratorService);
+  readonly isFullscreen = this.resumeService.isFullscreen;
+}
+

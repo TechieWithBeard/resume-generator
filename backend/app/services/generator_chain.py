@@ -375,7 +375,7 @@ class GeneratorChain:
         # STAGE 5: Template Rendering & Complete Event
         # -------------------------------------------------------------
         rendered_html = template_engine.render(
-            verified_resume, template_id=effective_template_id, highlight_diff=True, base_resume=base_resume
+            verified_resume, template_id=effective_template_id, highlight_diff=False, base_resume=base_resume
         )
 
         yield {

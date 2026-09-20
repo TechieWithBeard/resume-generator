@@ -187,6 +187,12 @@ class TestResumeGenerator(unittest.TestCase):
         self.assertIn("Netherlands", html)
         self.assertIn("avoid-break", html)
         self.assertIn("@media print", html)
+        self.assertNotIn("DIFF VIEW ACTIVE", html)
+
+        # Verify Diff Highlighting Mode
+        diff_html = template_engine.render(cv_resume, template_id="cv_executive", highlight_diff=True)
+        self.assertIn("DIFF VIEW ACTIVE", diff_html)
+        self.assertIn("Tailored Profile", diff_html)
 
     def test_cv_generator_stream_and_alignment(self):
         """Verifies generator stream produces aligned CV with projects, certs, and cv_executive template."""

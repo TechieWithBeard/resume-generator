@@ -7,19 +7,39 @@
         [ngClass]="isStreaming() ? 'bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse' : 'bg-slate-500'"
       ></span>
       <span class="text-xs font-mono font-semibold text-slate-200">
-        AI Decision Stream & Alignment Engine
+        AI Reasoning Stream &amp; Audit
       </span>
     </div>
 
-    <div>
+    <div class="flex items-center gap-2">
       @if (isStreaming()) {
-        <app-badge variant="neutral" size="sm" [dot]="true">Processing Stream...</app-badge>
+        <app-badge variant="neutral" size="sm" [dot]="true">Streaming...</app-badge>
       } @else if (currentStep() === 'done') {
-        <app-badge variant="success" size="sm">✓ Generation Complete</app-badge>
+        <app-badge variant="success" size="sm">✓ Ready</app-badge>
       }
+
+      <button
+        type="button"
+        (click)="toggleCollapse()"
+        class="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-slate-700/60 hover:bg-slate-700 text-slate-300 hover:text-white transition-all border border-slate-600/50 flex items-center gap-1 cursor-pointer"
+        [title]="isCollapsed() ? 'Expand AI stream console' : 'Collapse AI stream console'"
+      >
+        <span>{{ isCollapsed() ? '▼ Show Stream' : '▲ Collapse' }}</span>
+      </button>
     </div>
   </div>
 
+  @if (isCollapsed()) {
+    <div class="px-4 py-2 bg-slate-900 text-xs flex items-center justify-between text-slate-400">
+      <div class="flex items-center gap-2">
+        <span class="font-mono text-slate-500">&gt;</span>
+        <span>AI stream idle. Click <strong>Show Stream</strong> to inspect step logs &amp; tokens.</span>
+      </div>
+      @if (auditReport()) {
+        <span class="text-sky-400 font-bold font-mono">{{ auditReport()?.match_score }}% Match</span>
+      }
+    </div>
+  } @else {
   <!-- Stepper Bar -->
   <div class="flex items-center px-4 py-2.5 bg-slate-950 border-b border-slate-800/60 text-[11px] overflow-x-auto">
     <div class="flex items-center gap-1.5 shrink-0" [ngClass]="{'text-sky-400 font-bold': currentStep() === 'analysis', 'text-emerald-400': isPast('analysis'), 'text-slate-500': currentStep() !== 'analysis' && !isPast('analysis')}">
@@ -132,5 +152,6 @@
         }
       </div>
     </div>
+  }
   }
 </app-card>

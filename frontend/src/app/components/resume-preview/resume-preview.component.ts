@@ -16,18 +16,44 @@ export class ResumePreviewComponent {
   @ViewChild('resumeIframe') resumeIframe?: ElementRef<HTMLIFrameElement>;
 
   readonly renderedHtml = this.resumeService.renderedHtml;
+  readonly baseRenderedHtml = this.resumeService.baseRenderedHtml;
   readonly templates = this.resumeService.availableTemplates;
   readonly selectedTemplate = this.resumeService.selectedTemplate;
   readonly comparisonMode = this.resumeService.comparisonMode;
+  readonly viewMode = this.resumeService.viewMode;
   readonly documentMode = this.resumeService.documentMode;
+  readonly isFullscreen = this.resumeService.isFullscreen;
+  readonly previewZoom = this.resumeService.previewZoom;
+  readonly auditReport = this.resumeService.auditReport;
+  readonly baseResume = this.resumeService.baseResume;
+  readonly tailoredResume = this.resumeService.tailoredResume;
 
   onSelectTemplate(tmplId: string): void {
-
     this.resumeService.selectTemplate(tmplId);
+  }
+
+  onSetViewMode(mode: 'single' | 'split'): void {
+    this.resumeService.setViewMode(mode);
   }
 
   onToggleDiff(): void {
     this.resumeService.toggleComparisonMode();
+  }
+
+  onZoomIn(): void {
+    this.resumeService.zoomIn();
+  }
+
+  onZoomOut(): void {
+    this.resumeService.zoomOut();
+  }
+
+  onResetZoom(): void {
+    this.resumeService.resetZoom();
+  }
+
+  onToggleFullscreen(): void {
+    this.resumeService.toggleFullscreen();
   }
 
   onDownloadPdf(): void {
