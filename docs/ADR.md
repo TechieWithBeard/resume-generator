@@ -144,3 +144,27 @@ Design a unified LLM Provider Adapter interface:
 ### Consequences
 - **Positive**: Maximum portability across local, private, and cloud environments.
 - **Positive**: 100% out-of-the-box functional experience for anyone downloading the package.
+
+---
+
+## ADR-006: Real-Time LLM Token Streaming (`astream`) and Domain Competency Inference
+
+### Status
+Accepted
+
+### Context
+During testing with concise job specifications (e.g. `Senior Frontend Developer at Rentman — Utrecht, Netherlands`) and local Ollama execution, two architectural friction points emerged:
+1. **LLM Invocation Latency Freeze**: Calling synchronous/blocking `ainvoke()` caused a ~60–80 second delay where no SSE chunks were yielded, giving the illusion of a frozen or broken system.
+2. **Concise Headline Inputs**: Users frequently paste high-level role headlines rather than multi-page technical checklists. Rigid literal keyword matching produced empty competency matches for concise titles.
+3. **Capacity Misunderstanding**: Dynamic character length counters (e.g. `Ingesting job specification (172 characters)...`) were misinterpreted by users as arbitrary character limits.
+
+### Decision
+1. **Granular Token Streaming**: Replaced blocking `ainvoke()` with LangChain's asynchronous token streaming `llm.astream()`. The engine yields granular `thought_stream` / `token` events over SSE as words are emitted, rendering a live typewriter view in the frontend.
+2. **Entity & Domain Competency Inference**: Enhanced the analysis stage to extract entities (company: *Rentman*, location: *Utrecht, Netherlands*, role: *Senior Frontend Developer*) and automatically infer core domain competencies when tech mentions are sparse, cross-referencing against the candidate's verified Base Resume.
+3. **Capacity & Context Expansion**: Explicitly expanded prompt context snippets up to 15,000+ characters to comfortably process enterprise multi-page LinkedIn JDs in full, and clarified logging to display received character length without confusing it for a limit.
+4. **Dynamic Model Discovery**: Auto-detects installed models in the local Ollama catalog (`/api/tags`), preventing failures when specific tags like `llama3.1:8b` are installed instead of generic `llama3`.
+
+### Consequences
+- **Positive**: Zero dead pauses or frozen screens during LLM reasoning.
+- **Positive**: High match scores and tailored summaries even for single-line job inputs.
+- **Positive**: Transparent visibility into AI decision-making.

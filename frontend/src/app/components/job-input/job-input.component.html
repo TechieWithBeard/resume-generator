@@ -65,11 +65,14 @@
     <!-- Raw Job Description Textarea Section -->
     <div class="space-y-1.5" [class.hidden]="activeTab() !== 'text' && !jobDescription">
       <div class="flex items-center justify-between">
-        <label for="jobDesc" class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-          Job Description / Core Requirements
+        <label for="jobDesc" class="text-xs font-semibold text-slate-700 flex items-center gap-1.5 flex-wrap">
+          <span>Job Description / Core Requirements</span>
           @if (jobDescription) {
-            <span class="text-[11px] font-normal text-slate-400">({{ jobDescription.length }} chars)</span>
+            <span class="text-[11px] font-mono text-slate-500">({{ jobDescription.length }} characters)</span>
           }
+          <span class="text-[10px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+            Full-length JDs supported (up to 15,000+ chars)
+          </span>
         </label>
         <button
           type="button"

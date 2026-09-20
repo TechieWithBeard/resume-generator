@@ -17,6 +17,7 @@ export class StreamConsoleComponent {
   @ViewChild('terminalBox') terminalBox!: ElementRef<HTMLDivElement>;
 
   readonly logs = this.resumeService.streamLogs;
+  readonly activeStreamingText = this.resumeService.activeStreamingText;
   readonly isStreaming = this.resumeService.isStreaming;
   readonly currentStep = this.resumeService.currentStep;
   readonly auditReport = this.resumeService.auditReport;
@@ -24,11 +25,12 @@ export class StreamConsoleComponent {
   constructor() {
     effect(() => {
       this.logs();
+      this.activeStreamingText();
       setTimeout(() => {
         if (this.terminalBox) {
           this.terminalBox.nativeElement.scrollTop = this.terminalBox.nativeElement.scrollHeight;
         }
-      }, 40);
+      }, 30);
     });
   }
 

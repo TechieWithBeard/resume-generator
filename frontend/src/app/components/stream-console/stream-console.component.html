@@ -50,7 +50,7 @@
   </div>
 
   <!-- Terminal Output Box -->
-  <div #terminalBox class="p-4 h-56 overflow-y-auto font-mono text-xs leading-relaxed bg-[#020617] text-slate-300">
+  <div #terminalBox class="p-4 h-64 overflow-y-auto font-mono text-xs leading-relaxed bg-[#020617] text-slate-300">
     @if (logs().length === 0 && !isStreaming()) {
       <div class="text-slate-500 pt-2 flex items-start gap-2">
         <span class="text-sky-500">&gt;</span>
@@ -60,7 +60,7 @@
       @for (log of logs(); track log.timestamp + log.content) {
         <div class="mb-2 whitespace-pre-wrap break-words">
           <span class="text-slate-500 text-[10px] mr-2">[{{ log.timestamp }}]</span>
-          <span class="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold uppercase mr-2"
+          <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase mr-2"
             [ngClass]="{
               'bg-blue-500/20 text-blue-400': log.step === 'analysis',
               'bg-amber-500/20 text-amber-400': log.step === 'audit',
@@ -71,7 +71,22 @@
           <span class="text-slate-200">{{ log.content }}</span>
         </div>
       }
-      @if (isStreaming()) {
+
+      <!-- Real-Time Token Reasoning Stream -->
+      @if (activeStreamingText()) {
+        <div class="my-2.5 p-3 rounded-lg bg-sky-950/40 border border-sky-500/30 text-sky-200">
+          <div class="flex items-center gap-2 mb-1.5 text-[10px] font-bold text-sky-400 uppercase tracking-wider">
+            <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
+            <span>AI Real-Time Reasoning Stream:</span>
+          </div>
+          <div class="whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-100 font-mono">
+            <span>{{ activeStreamingText() }}</span>
+            <span class="inline-block w-2 h-3.5 bg-sky-400 animate-pulse ml-0.5 align-middle"></span>
+          </div>
+        </div>
+      }
+
+      @if (isStreaming() && !activeStreamingText()) {
         <div class="text-sky-400 animate-pulse">▍</div>
       }
     }

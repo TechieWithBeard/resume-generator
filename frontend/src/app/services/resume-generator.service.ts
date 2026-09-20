@@ -21,6 +21,7 @@ export class ResumeGeneratorService {
   readonly activeResume = computed(() => this.tailoredResume() || this.baseResume());
   readonly renderedHtml = signal<string>('');
   readonly streamLogs = signal<ThoughtLog[]>([]);
+  readonly activeStreamingText = signal<string>('');
   readonly currentStep = signal<GeneratorStep>('idle');
   readonly auditReport = signal<AlignmentReport | null>(null);
   readonly isStreaming = signal<boolean>(false);
@@ -36,7 +37,7 @@ export class ResumeGeneratorService {
 
   readonly llmConfig = signal<LLMConfig>({
     provider: 'auto',
-    model_name: 'llama3',
+    model_name: 'llama3.1:8b',
     base_url: 'http://localhost:11434',
     temperature: 0.2,
   });
@@ -173,6 +174,7 @@ export class ResumeGeneratorService {
     this.isStreaming.set(true);
     this.streamError.set(null);
     this.streamLogs.set([]);
+    this.activeStreamingText.set('');
     this.currentStep.set('analysis');
 
     const payload = {
@@ -245,7 +247,23 @@ export class ResumeGeneratorService {
   private handleStreamEvent(type: string, data: any): void {
     if (type === 'step') {
       this.currentStep.set(data.step as GeneratorStep);
+    } else if (type === 'thought_stream' || type === 'token') {
+      this.activeStreamingText.update((text) => text + (data.content || ''));
     } else if (type === 'thought') {
+      // If there was active streaming text accumulated, commit it to logs
+      const currentStream = this.activeStreamingText().trim();
+      if (currentStream) {
+        this.streamLogs.update((logs) => [
+          ...logs,
+          {
+            step: 'synthesis',
+            content: currentStream,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
+        this.activeStreamingText.set('');
+      }
+
       this.streamLogs.update((logs) => [
         ...logs,
         {
@@ -257,6 +275,18 @@ export class ResumeGeneratorService {
     } else if (type === 'audit') {
       this.auditReport.set(data.data || data);
     } else if (type === 'complete') {
+      const currentStream = this.activeStreamingText().trim();
+      if (currentStream) {
+        this.streamLogs.update((logs) => [
+          ...logs,
+          {
+            step: 'synthesis',
+            content: currentStream,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
+        this.activeStreamingText.set('');
+      }
       if (data.resume) {
         this.tailoredResume.set(data.resume);
       }
