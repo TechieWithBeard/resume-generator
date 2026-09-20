@@ -7,8 +7,9 @@ Includes:
 Embedded print styles ensure pixel-perfect PDF export via browser print engine.
 """
 
+import difflib
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 from backend.app.models.resume import ResumeData, TemplateConfig
 
 
@@ -112,6 +113,106 @@ class TemplateEngine:
         {config.custom_css or ""}
         """
 
+    def highlight_target_terms(self, text: str, target_terms: Set[str]) -> str:
+        """Highlights matching target keywords in text."""
+        if not text or not target_terms:
+            return text
+        words = text.split()
+        out = []
+        for w in words:
+            w_clean = re.sub(r"[^\w\+\#]", "", w.lower())
+            if w_clean in target_terms or any(t in w_clean for t in target_terms if len(t) > 3):
+                out.append(f'<mark class="diff-kw-term">{w}</mark>')
+            else:
+                out.append(w)
+        return " ".join(out)
+
+    def diff_text(
+        self,
+        new_text: str,
+        base_text: Optional[str] = None,
+        target_terms: Optional[Set[str]] = None,
+    ) -> str:
+        """
+        Computes word-level diff markup between base_text and new_text.
+        - Inserts <mark class="diff-text-added"> for added words.
+        - Inserts <mark class="diff-text-adapted"> for adapted/replaced words.
+        - Inserts <mark class="diff-kw-term"> for target keyword matches.
+        """
+        if not new_text:
+            return ""
+        target_terms = target_terms or set()
+
+        if base_text is None:
+            return self.highlight_target_terms(new_text, target_terms)
+        if base_text.strip() == new_text.strip():
+            return self.highlight_target_terms(new_text, target_terms)
+
+        base_words = base_text.split()
+        new_words = new_text.split()
+
+        matcher = difflib.SequenceMatcher(
+            None,
+            [w.lower() for w in base_words],
+            [w.lower() for w in new_words],
+        )
+
+        out_tokens = []
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == "equal":
+                for w in new_words[j1:j2]:
+                    w_clean = re.sub(r"[^\w\+\#]", "", w.lower())
+                    if w_clean in target_terms or any(t in w_clean for t in target_terms if len(t) > 3):
+                        out_tokens.append(f'<mark class="diff-kw-term">{w}</mark>')
+                    else:
+                        out_tokens.append(w)
+            elif tag in ("insert", "replace"):
+                cls = "diff-text-added" if tag == "insert" else "diff-text-adapted"
+                sub_tokens = []
+                for w in new_words[j1:j2]:
+                    w_clean = re.sub(r"[^\w\+\#]", "", w.lower())
+                    if w_clean in target_terms or any(t in w_clean for t in target_terms if len(t) > 3):
+                        sub_tokens.append(f'<strong class="diff-kw-match">{w}</strong>')
+                    else:
+                        sub_tokens.append(w)
+                chunk = " ".join(sub_tokens)
+                out_tokens.append(f'<mark class="{cls}">{chunk}</mark>')
+            elif tag == "delete":
+                pass
+
+        return " ".join(out_tokens)
+
+    def diff_bullet(
+        self,
+        bullet: str,
+        base_bullets: List[str],
+        target_terms: Set[str],
+    ) -> Tuple[str, bool, bool]:
+        """
+        Compares a tailored bullet against base bullets to find closest match and highlight changes.
+        Returns: (highlighted_html, is_modified, has_target_kw)
+        """
+        b_clean = bullet.strip().lower()
+        base_clean_set = {b.strip().lower() for b in base_bullets}
+        has_target_kw = any(kw in b_clean for kw in target_terms if len(kw) > 3)
+
+        if b_clean in base_clean_set:
+            return self.highlight_target_terms(bullet, target_terms), False, has_target_kw
+
+        closest = difflib.get_close_matches(bullet, base_bullets, n=1, cutoff=0.3)
+        if closest:
+            diffed = self.diff_text(bullet, closest[0], target_terms)
+            return diffed, True, has_target_kw
+
+        sub_tokens = []
+        for w in bullet.split():
+            w_clean = re.sub(r"[^\w\+\#]", "", w.lower())
+            if w_clean in target_terms or any(t in w_clean for t in target_terms if len(t) > 3):
+                sub_tokens.append(f'<strong class="diff-kw-match">{w}</strong>')
+            else:
+                sub_tokens.append(w)
+        return f'<mark class="diff-text-added">{" ".join(sub_tokens)}</mark>', True, has_target_kw
+
     def render(
         self,
         resume: ResumeData,
@@ -146,11 +247,23 @@ class TemplateEngine:
         base_resume: Optional[ResumeData] = None,
         config: Optional[TemplateConfig] = None,
     ) -> str:
-        base_highlights = set()
-        if highlight_diff and base_resume:
-            for exp in base_resume.experience:
-                for h in exp.highlights:
-                    base_highlights.add(h.strip().lower())
+        if base_resume is None:
+            try:
+                from .resume_store import resume_store
+                base_resume = resume_store.get_base_resume()
+            except Exception:
+                pass
+
+        base_bullets_by_company = {}
+        all_base_bullets = []
+        base_projects_by_name = {}
+        if base_resume:
+            for b_exp in base_resume.experience:
+                c_key = b_exp.company.strip().lower()
+                base_bullets_by_company.setdefault(c_key, []).extend(b_exp.highlights)
+                all_base_bullets.extend(b_exp.highlights)
+            for b_proj in (getattr(base_resume, "projects", None) or []):
+                base_projects_by_name[b_proj.name.strip().lower()] = b_proj.description
 
         target_role = getattr(resume, "target_role", None)
         target_company = getattr(resume, "target_company", None)
@@ -168,22 +281,30 @@ class TemplateEngine:
         if highlight_diff:
             diff_legend_html = """
             <div class="cv-diff-banner avoid-break" style="background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:8px 12px; margin-bottom:14px; font-size:8pt; color:#166534;">
-                <div style="font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
-                    <span>🔍</span><strong>DIFF VIEW ACTIVE:</strong> Highlighted modifications &amp; target keyword matches
+                <div style="font-weight:700; margin-bottom:5px; display:flex; align-items:center; gap:6px;">
+                    <span>🔍</span><strong>DIFF VIEW ACTIVE:</strong> Real-time word-level audit of tailored text &amp; keywords
                 </div>
                 <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:7.5pt;">
-                    <span style="background:#fff; border:1px solid #d1fae5; padding:1px 6px; border-radius:3px;">🟢 Tailored Profile</span>
-                    <span style="background:#fff; border:1px solid #fef3c7; padding:1px 6px; border-radius:3px;">🟡 Adapted Highlight</span>
-                    <span style="background:#fff; border:1px solid #e0f2fe; padding:1px 6px; border-radius:3px;">🔵 Target Skill Match</span>
+                    <span style="background:#bbf7d0; color:#14532d; border:1px solid #86efac; padding:1px 6px; border-radius:3px; font-weight:700;">🟢 + Added Text</span>
+                    <span style="background:#fef08a; color:#713f12; border:1px solid #fde047; padding:1px 6px; border-radius:3px; font-weight:700;">🟡 ~ Adapted Text</span>
+                    <span style="background:#bae6fd; color:#0369a1; border:1px solid #7dd3fc; padding:1px 6px; border-radius:3px; font-weight:700;">🔵 ★ Target Keyword</span>
+                    <span style="background:#fff; color:#475569; border:1px solid #cbd5e1; padding:1px 6px; border-radius:3px; font-weight:600;">⚪ Verified Invariant</span>
                 </div>
             </div>
             """
 
+        base_summary = base_resume.summary if base_resume else ""
         is_summary_modified = False
         if highlight_diff and base_resume:
-            is_summary_modified = (resume.summary.strip().lower() != base_resume.summary.strip().lower())
+            is_summary_modified = (resume.summary.strip().lower() != base_summary.strip().lower())
         elif highlight_diff:
             is_summary_modified = True
+
+        rendered_summary = (
+            self.diff_text(resume.summary, base_summary, target_terms)
+            if highlight_diff
+            else resume.summary
+        )
 
         use_icons = config.show_icons if config is not None else True
         icon_email = "✉ " if use_icons else ""
@@ -210,20 +331,25 @@ class TemplateEngine:
         exp_html = ""
         for exp in resume.experience:
             bullets = ""
+            c_key = exp.company.strip().lower()
+            relevant_base_bullets = base_bullets_by_company.get(c_key, all_base_bullets)
             for h in exp.highlights:
-                is_modified = highlight_diff and (h.strip().lower() not in base_highlights)
-                has_target_kw = highlight_diff and any(kw in h.lower() for kw in target_terms if len(kw) > 3)
-                
-                if is_modified:
-                    highlight_cls = "highlighted-bullet mod"
-                    bullet_badge = '<span class="diff-bullet-badge mod" style="background:#fde68a; color:#92400e; font-size:7pt; font-weight:800; padding:1px 4px; border-radius:2px; text-transform:uppercase; margin-right:4px;">+ Tailored</span> '
-                elif has_target_kw:
-                    highlight_cls = "highlighted-bullet kw"
-                    bullet_badge = '<span class="diff-bullet-badge kw" style="background:#bae6fd; color:#0369a1; font-size:7pt; font-weight:800; padding:1px 4px; border-radius:2px; text-transform:uppercase; margin-right:4px;">★ Key Skill</span> '
+                if highlight_diff:
+                    h_rendered, is_modified, has_target_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
+                    if is_modified:
+                        highlight_cls = "highlighted-bullet mod"
+                        bullet_badge = '<span class="diff-bullet-badge mod" style="background:#fde68a; color:#92400e; font-size:7pt; font-weight:800; padding:1px 4px; border-radius:2px; text-transform:uppercase; margin-right:4px;">+ Tailored</span> '
+                    elif has_target_kw:
+                        highlight_cls = "highlighted-bullet kw"
+                        bullet_badge = '<span class="diff-bullet-badge kw" style="background:#bae6fd; color:#0369a1; font-size:7pt; font-weight:800; padding:1px 4px; border-radius:2px; text-transform:uppercase; margin-right:4px;">★ Key Skill</span> '
+                    else:
+                        highlight_cls = ""
+                        bullet_badge = ""
                 else:
+                    h_rendered = h
                     highlight_cls = ""
                     bullet_badge = ""
-                bullets += f'<li class="{highlight_cls}">{bullet_badge}{h}</li>\n'
+                bullets += f'<li class="{highlight_cls}">{bullet_badge}{h_rendered}</li>\n'
             
             loc_str = f'<span class="exp-location">{exp.location}</span>' if exp.location else ''
             exp_html += f"""
@@ -271,13 +397,19 @@ class TemplateEngine:
                 tech_badges = "".join([f'<span class="tech-badge" style="background:#f1f5f9; color:#334155; padding:2px 6px; border-radius:3px; font-size:8pt; margin-right:4px;">{t}</span>' for t in proj.technologies])
                 url_link = f' <a href="{proj.url}" target="_blank" style="color:var(--accent-color); text-decoration:none; font-size:8pt;">🔗</a>' if proj.url else ''
                 period_str = f'<span class="exp-period">{proj.period}</span>' if proj.period else ''
+                base_p_desc = base_projects_by_name.get(proj.name.strip().lower(), "")
+                rendered_p_desc = (
+                    self.diff_text(proj.description, base_p_desc, target_terms)
+                    if highlight_diff and proj.description
+                    else proj.description
+                )
                 projects_html += f"""
                 <div class="experience-entry">
                     <div class="exp-header">
                         <span class="exp-role">{proj.name}{url_link}</span>
                         {period_str}
                     </div>
-                    <div class="summary-text" style="margin-bottom: 4px;">{proj.description}</div>
+                    <div class="summary-text" style="margin-bottom: 4px;">{rendered_p_desc}</div>
                     <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">{tech_badges}</div>
                 </div>
                 """
@@ -440,6 +572,53 @@ class TemplateEngine:
     padding-left: 6px;
     border-radius: 2px;
   }}
+  mark.diff-text-added {{
+    background-color: #bbf7d0 !important;
+    color: #14532d !important;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 1px 4px;
+    box-shadow: 0 0 0 1px #86efac;
+    text-decoration: none;
+  }}
+  mark.diff-text-adapted {{
+    background-color: #fef08a !important;
+    color: #713f12 !important;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 1px 4px;
+    box-shadow: 0 0 0 1px #fde047;
+    text-decoration: none;
+  }}
+  mark.diff-kw-term {{
+    background-color: #bae6fd !important;
+    color: #0369a1 !important;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 1px 4px;
+    box-shadow: 0 0 0 1px #7dd3fc;
+    text-decoration: none;
+  }}
+  strong.diff-kw-match {{
+    color: #0369a1 !important;
+    font-weight: 800 !important;
+    text-decoration: underline;
+  }}
+  @media print {{
+    mark.diff-text-added, mark.diff-text-adapted, mark.diff-kw-term {{
+      background-color: transparent !important;
+      color: inherit !important;
+      font-weight: inherit !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      text-decoration: none !important;
+    }}
+    strong.diff-kw-match {{
+      color: inherit !important;
+      font-weight: inherit !important;
+      text-decoration: none !important;
+    }}
+  }}
   .skill-group {{
     display: flex;
     align-items: center;
@@ -527,7 +706,7 @@ class TemplateEngine:
 
   <div class="section">
     <div class="section-title">Professional Summary {f'<span style="background:#dcfce7; color:#15803d; font-size:7.5pt; font-weight:800; padding:2px 6px; border-radius:3px; text-transform:uppercase; margin-left:8px; border:1px solid #bbf7d0;">+ Tailored for {target_role or "Role"}</span>' if is_summary_modified else ''}</div>
-    <div class="summary-text" style="{f'background:#f0fdf4; border-left:3px solid #16a34a; padding:8px 12px; border-radius:0 4px 4px 0;' if is_summary_modified else ''}">{resume.summary}</div>
+    <div class="summary-text" style="{f'background:#f0fdf4; border-left:3px solid #16a34a; padding:8px 12px; border-radius:0 4px 4px 0;' if is_summary_modified else ''}">{rendered_summary}</div>
   </div>
 
   <div class="section">
@@ -564,11 +743,16 @@ class TemplateEngine:
             except Exception:
                 pass
 
-        base_highlights = set()
-        if highlight_diff and base_resume:
-            for exp in base_resume.experience:
-                for h in exp.highlights:
-                    base_highlights.add(h.strip().lower())
+        base_bullets_by_company = {}
+        all_base_bullets = []
+        base_projects_by_name = {}
+        if base_resume:
+            for b_exp in base_resume.experience:
+                c_key = b_exp.company.strip().lower()
+                base_bullets_by_company.setdefault(c_key, []).extend(b_exp.highlights)
+                all_base_bullets.extend(b_exp.highlights)
+            for b_proj in (getattr(base_resume, "projects", None) or []):
+                base_projects_by_name[b_proj.name.strip().lower()] = b_proj.description
 
         target_role = getattr(resume, "target_role", None)
         target_terms = set()
@@ -584,11 +768,12 @@ class TemplateEngine:
         if highlight_diff:
             diff_legend_html = """
             <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:4px; padding:8px 12px; margin-bottom:14px; font-size:8pt; color:#166534; font-family:sans-serif;">
-                <div style="font-weight:700; margin-bottom:4px;">🔍 DIFF VIEW ACTIVE: Tailored modifications &amp; target keyword alignment</div>
+                <div style="font-weight:700; margin-bottom:5px;">🔍 DIFF VIEW ACTIVE: Real-time word-level audit of tailored text &amp; keywords</div>
                 <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:7.5pt;">
-                    <span style="background:#fff; border:1px solid #d1fae5; padding:1px 6px; border-radius:3px;">🟢 Tailored Profile</span>
-                    <span style="background:#fff; border:1px solid #fef3c7; padding:1px 6px; border-radius:3px;">🟡 Adapted Achievement</span>
-                    <span style="background:#fff; border:1px solid #e0f2fe; padding:1px 6px; border-radius:3px;">🔵 Target Skill Match</span>
+                    <span style="background:#bbf7d0; color:#14532d; border:1px solid #86efac; padding:1px 6px; border-radius:3px; font-weight:700;">🟢 + Added Text</span>
+                    <span style="background:#fef08a; color:#713f12; border:1px solid #fde047; padding:1px 6px; border-radius:3px; font-weight:700;">🟡 ~ Adapted Text</span>
+                    <span style="background:#bae6fd; color:#0369a1; border:1px solid #7dd3fc; padding:1px 6px; border-radius:3px; font-weight:700;">🔵 ★ Target Keyword</span>
+                    <span style="background:#fff; color:#475569; border:1px solid #cbd5e1; padding:1px 6px; border-radius:3px; font-weight:600;">⚪ Verified Invariant</span>
                 </div>
             </div>
             """
@@ -600,13 +785,17 @@ class TemplateEngine:
         exp_html = ""
         for exp in resume.experience:
             bullets = ""
+            c_key = exp.company.strip().lower()
+            relevant_base_bullets = base_bullets_by_company.get(c_key, all_base_bullets)
             for h in exp.highlights:
-                is_modified = highlight_diff and (h.strip().lower() not in base_highlights)
-                has_target_kw = highlight_diff and any(kw in h.lower() for kw in target_terms if len(kw) > 3)
-                if is_modified:
-                    bullets += f'<li style="background:#fef9c3; border-left:3px solid #f59e0b; padding-left:4px; margin-bottom:3px;"><span style="background:#fde68a; color:#92400e; font-size:7pt; font-weight:bold; padding:1px 4px; border-radius:2px; margin-right:4px;">+ TAILORED</span>{h}</li>'
-                elif has_target_kw:
-                    bullets += f'<li style="background:#f0f9ff; border-left:3px solid #0284c7; padding-left:4px; margin-bottom:3px;"><span style="background:#bae6fd; color:#0369a1; font-size:7pt; font-weight:bold; padding:1px 4px; border-radius:2px; margin-right:4px;">★ KEY SKILL</span>{h}</li>'
+                if highlight_diff:
+                    h_rendered, is_modified, has_target_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
+                    if is_modified:
+                        bullets += f'<li style="background:#fef9c3; border-left:3px solid #f59e0b; padding-left:4px; margin-bottom:3px;"><span style="background:#fde68a; color:#92400e; font-size:7pt; font-weight:bold; padding:1px 4px; border-radius:2px; margin-right:4px;">+ TAILORED</span>{h_rendered}</li>'
+                    elif has_target_kw:
+                        bullets += f'<li style="background:#f0f9ff; border-left:3px solid #0284c7; padding-left:4px; margin-bottom:3px;"><span style="background:#bae6fd; color:#0369a1; font-size:7pt; font-weight:bold; padding:1px 4px; border-radius:2px; margin-right:4px;">★ KEY SKILL</span>{h_rendered}</li>'
+                    else:
+                        bullets += f'<li style="margin-bottom:3px;">{h_rendered}</li>'
                 else:
                     bullets += f'<li style="margin-bottom:3px;">{h}</li>'
 
@@ -634,11 +823,18 @@ class TemplateEngine:
             skills_lines.append(f"<strong>{cat_label}:</strong> " + ", ".join(pills))
         skills_html = "<br>".join(skills_lines)
 
+        base_summary = base_resume.summary if base_resume else ""
         is_summary_modified = False
         if highlight_diff and base_resume:
-            is_summary_modified = (resume.summary.strip().lower() != base_resume.summary.strip().lower())
+            is_summary_modified = (resume.summary.strip().lower() != base_summary.strip().lower())
         elif highlight_diff:
             is_summary_modified = True
+
+        rendered_summary = (
+            self.diff_text(resume.summary, base_summary, target_terms)
+            if highlight_diff
+            else resume.summary
+        )
 
         summary_style = "font-size: 10pt; text-align: justify; background: #f0fdf4; border-left: 3px solid #16a34a; padding: 6px 10px;" if is_summary_modified else "font-size: 10pt; text-align: justify;"
         summary_badge = f' <span style="background:#dcfce7; color:#15803d; font-size:7pt; font-weight:bold; padding:1px 5px; border-radius:2px; vertical-align:middle;">+ TAILORED FOR {target_role.upper() if target_role else "TARGET"}</span>' if is_summary_modified else ''
@@ -650,10 +846,16 @@ class TemplateEngine:
                 techs = f" — <em>{', '.join(proj.technologies)}</em>" if proj.technologies else ""
                 url_s = f' <a href="{proj.url}" target="_blank">🔗</a>' if proj.url else ""
                 period_s = f" ({proj.period})" if proj.period else ""
+                base_p_desc = base_projects_by_name.get(proj.name.strip().lower(), "")
+                rendered_p_desc = (
+                    self.diff_text(proj.description, base_p_desc, target_terms)
+                    if highlight_diff and proj.description
+                    else proj.description
+                )
                 projects_html += f"""
                 <div class="project-card" style="margin-bottom: 10px;">
                   <div><strong>{proj.name}</strong>{period_s}{url_s}{techs}</div>
-                  <p style="font-size: 9.5pt; margin: 2px 0 6px 0;">{proj.description}</p>
+                  <p style="font-size: 9.5pt; margin: 2px 0 6px 0;">{rendered_p_desc}</p>
                 </div>
                 """
 
@@ -691,6 +893,53 @@ class TemplateEngine:
   .contacts {{ text-align: center; font-size: 9.5pt; border-bottom: 1px solid #222; padding-bottom: 12px; margin-bottom: 18px; }}
   .sec-heading, .section-title {{ font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #aaa; padding-bottom: 2px; margin: 16px 0 10px 0; letter-spacing: 0.5px; }}
   @media print {{ body {{ background: #fff; padding: 0; }} .paper, .resume-paper {{ box-shadow: none; padding: 0; }} }}
+  mark.diff-text-added {{
+    background-color: #bbf7d0 !important;
+    color: #14532d !important;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 1px 4px;
+    box-shadow: 0 0 0 1px #86efac;
+    text-decoration: none;
+  }}
+  mark.diff-text-adapted {{
+    background-color: #fef08a !important;
+    color: #713f12 !important;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 1px 4px;
+    box-shadow: 0 0 0 1px #fde047;
+    text-decoration: none;
+  }}
+  mark.diff-kw-term {{
+    background-color: #bae6fd !important;
+    color: #0369a1 !important;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 1px 4px;
+    box-shadow: 0 0 0 1px #7dd3fc;
+    text-decoration: none;
+  }}
+  strong.diff-kw-match {{
+    color: #0369a1 !important;
+    font-weight: 800 !important;
+    text-decoration: underline;
+  }}
+  @media print {{
+    mark.diff-text-added, mark.diff-text-adapted, mark.diff-kw-term {{
+      background-color: transparent !important;
+      color: inherit !important;
+      font-weight: inherit !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      text-decoration: none !important;
+    }}
+    strong.diff-kw-match {{
+      color: inherit !important;
+      font-weight: inherit !important;
+      text-decoration: none !important;
+    }}
+  }}
   {self._build_dynamic_styles(config)}
 </style>
 </head>
@@ -705,7 +954,7 @@ class TemplateEngine:
 
   <div class="section">
     <div class="sec-heading">Summary{summary_badge}</div>
-    <p style="{summary_style}">{resume.summary}</p>
+    <p style="{summary_style}">{rendered_summary}</p>
   </div>
 
   <div class="section">
@@ -742,11 +991,20 @@ class TemplateEngine:
             except Exception:
                 pass
 
-        base_highlights = set()
-        if highlight_diff and base_resume:
-            for exp in base_resume.experience:
-                for h in exp.highlights:
-                    base_highlights.add(h.strip().lower())
+        base_bullets_by_company = {}
+        all_base_bullets = []
+        base_scopes_by_company = {}
+        base_projects_by_name = {}
+        if base_resume:
+            for b_exp in base_resume.experience:
+                c_key = b_exp.company.strip().lower()
+                base_bullets_by_company.setdefault(c_key, []).extend(b_exp.highlights)
+                all_base_bullets.extend(b_exp.highlights)
+                if getattr(b_exp, "scope", None):
+                    base_scopes_by_company[c_key] = b_exp.scope
+            for b_proj in (getattr(base_resume, "projects", None) or []):
+                p_key = b_proj.name.strip().lower()
+                base_projects_by_name[p_key] = b_proj.description
 
         contacts = []
         if resume.email:
@@ -861,6 +1119,13 @@ class TemplateEngine:
                     </div>
                     """
 
+                base_p_desc = base_projects_by_name.get(p.name.strip().lower(), "")
+                rendered_p_desc = (
+                    self.diff_text(p.description, base_p_desc, target_terms)
+                    if highlight_diff and p.description
+                    else p.description
+                )
+
                 p_items += f"""
                 <div class="cv-project-card avoid-break">
                     <div class="entry-header">
@@ -872,7 +1137,7 @@ class TemplateEngine:
                         </div>
                         {p_period}
                     </div>
-                    <p class="project-desc">{p.description}</p>
+                    <p class="project-desc">{rendered_p_desc}</p>
                     {tech_badges}
                 </div>
                 """
@@ -887,32 +1152,41 @@ class TemplateEngine:
         exp_html = ""
         for exp in resume.experience:
             bullets = ""
+            c_key = exp.company.strip().lower()
+            relevant_base_bullets = base_bullets_by_company.get(c_key, all_base_bullets)
             for h in exp.highlights:
-                is_modified = highlight_diff and (h.strip().lower() not in base_highlights)
-                has_target_kw = highlight_diff and any(kw in h.lower() for kw in target_terms if len(kw) > 3)
-                
-                if is_modified:
-                    highlight_cls = "highlighted-bullet mod"
-                    bullet_badge = '<span class="diff-bullet-badge mod">+ Tailored</span> '
-                elif has_target_kw:
-                    highlight_cls = "highlighted-bullet kw"
-                    bullet_badge = '<span class="diff-bullet-badge kw">★ Key Skill</span> '
+                if highlight_diff:
+                    h_rendered, is_modified, has_target_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
+                    if is_modified:
+                        highlight_cls = "highlighted-bullet mod"
+                        bullet_badge = '<span class="diff-bullet-badge mod">+ Tailored</span> '
+                    elif has_target_kw:
+                        highlight_cls = "highlighted-bullet kw"
+                        bullet_badge = '<span class="diff-bullet-badge kw">★ Key Skill</span> '
+                    else:
+                        highlight_cls = ""
+                        bullet_badge = ""
+                    bullets += f'<li class="{highlight_cls}">{bullet_badge}{h_rendered}</li>\n'
                 else:
-                    highlight_cls = ""
-                    bullet_badge = ""
-                bullets += f'<li class="{highlight_cls}">{bullet_badge}{h}</li>\n'
+                    bullets += f'<li>{h}</li>\n'
 
             loc_str = f'<span class="exp-location">📍 {exp.location}</span>' if exp.location else ""
             
             scope_html = ""
             if getattr(exp, "scope", None):
+                base_scope = base_scopes_by_company.get(c_key, "")
+                rendered_scope = (
+                    self.diff_text(exp.scope, base_scope, target_terms)
+                    if highlight_diff
+                    else exp.scope
+                )
                 scope_tag = '<span class="scope-tag">⚡ SCOPE & LEADERSHIP:</span>'
                 if highlight_diff:
                     scope_tag = '<span class="scope-tag">⚡ SCOPE & LEADERSHIP:</span> <span class="diff-pill scope">+ Role Scope Enriched</span>'
                 scope_html = f"""
                 <div class="role-scope-box">
                     {scope_tag}
-                    <span class="scope-text">{exp.scope}</span>
+                    <span class="scope-text">{rendered_scope}</span>
                 </div>
                 """
 
@@ -1026,11 +1300,18 @@ class TemplateEngine:
             """
 
         # Executive Summary Box Diff styling
+        base_summary = base_resume.summary if base_resume else ""
         is_summary_modified = False
         if highlight_diff and base_resume:
-            is_summary_modified = (resume.summary.strip().lower() != base_resume.summary.strip().lower())
+            is_summary_modified = (resume.summary.strip().lower() != base_summary.strip().lower())
         elif highlight_diff:
             is_summary_modified = True
+
+        rendered_summary = (
+            self.diff_text(resume.summary, base_summary, target_terms)
+            if highlight_diff
+            else resume.summary
+        )
 
         summary_box_cls = "cv-summary-box diff-summary-box" if is_summary_modified else "cv-summary-box"
         summary_badge_html = f'<div class="diff-box-badge"><span class="diff-chip added">+ Tailored Strategic Profile</span> <span class="diff-note" style="font-size:7.5pt; color:#15803d; font-weight:600;">Aligned for {target_role or "Target Role"}</span></div>' if is_summary_modified else ""
@@ -1551,6 +1832,38 @@ class TemplateEngine:
     font-size: 7.5pt;
     color: var(--text-muted);
   }}
+  mark.diff-text-added {{
+    background-color: #bbf7d0 !important;
+    color: #14532d !important;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 1px 4px;
+    box-shadow: 0 0 0 1px #86efac;
+    text-decoration: none;
+  }}
+  mark.diff-text-adapted {{
+    background-color: #fef08a !important;
+    color: #713f12 !important;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 1px 4px;
+    box-shadow: 0 0 0 1px #fde047;
+    text-decoration: none;
+  }}
+  mark.diff-kw-term {{
+    background-color: #bae6fd !important;
+    color: #0369a1 !important;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 1px 4px;
+    box-shadow: 0 0 0 1px #7dd3fc;
+    text-decoration: none;
+  }}
+  strong.diff-kw-match {{
+    color: #0369a1 !important;
+    font-weight: 800 !important;
+    text-decoration: underline;
+  }}
   @media print {{
     body {{
       background: #ffffff;
@@ -1575,6 +1888,19 @@ class TemplateEngine:
       border-left: none !important;
       padding: 0 !important;
       font-weight: 600;
+    }}
+    mark.diff-text-added, mark.diff-text-adapted, mark.diff-kw-term {{
+      background-color: transparent !important;
+      color: inherit !important;
+      font-weight: inherit !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      text-decoration: none !important;
+    }}
+    strong.diff-kw-match {{
+      color: inherit !important;
+      font-weight: inherit !important;
+      text-decoration: none !important;
     }}
     .diff-summary-box {{
       border-left: 4px solid var(--accent-color) !important;
@@ -1610,7 +1936,7 @@ class TemplateEngine:
     <div class="section-title">01 / Executive Career Architecture & Strategic Profile</div>
     <div class="{summary_box_cls}">
       {summary_badge_html}
-      <p class="summary-text">{resume.summary}</p>
+      <p class="summary-text">{rendered_summary}</p>
     </div>
   </div>
 
