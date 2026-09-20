@@ -144,6 +144,34 @@ class TestResumeParser(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_normalize_letter_spaced_text_and_zero_loss(self):
+        """Verifies text normalization eliminates letter-spacing and preserves candidate data."""
+        from backend.app.services.resume_parser import normalize_extracted_text
+        import os
+
+        # Test synthetic tracked/spaced text (Canva/Figma/LaTeX pattern)
+        raw_spaced = "V I S H N U   T H A N K A P P A N\nS e n i o r   F r o n t e n d   E n g i n e e r\nv i s h n u t 0 7 1 @ g m a i l . c o m"
+        normalized = normalize_extracted_text(raw_spaced)
+        self.assertIn("VISHNU THANKAPPAN", normalized)
+        self.assertIn("Senior Frontend Engineer", normalized)
+        self.assertIn("vishnut071@gmail.com", normalized)
+
+        # Test real artifact PDF if available
+        pdf_path = "/Users/techiewithbeard/Downloads/vishnu-portfolio/RAG-Apps/ml/artifacts/VishnuThankappan_resume_2026.pdf"
+        if os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                pdf_bytes = f.read()
+
+            async def run_pdf():
+                resume, meta = await resume_parser.parse_resume(pdf_bytes, "VishnuThankappan_resume_2026.pdf")
+                self.assertEqual(resume.name, "Vishnu Thankappan")
+                self.assertEqual(resume.email, "vishnut071@gmail.com")
+                self.assertTrue(len(resume.experience) >= 3)
+                self.assertTrue(len(resume.education) >= 2)
+                self.assertTrue(len(resume.raw_text) > 2000)
+
+            asyncio.run(run_pdf())
+
 
 if __name__ == "__main__":
     unittest.main()

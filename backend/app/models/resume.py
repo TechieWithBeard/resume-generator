@@ -63,6 +63,9 @@ class ResumeData(BaseModel):
     certifications: List[CertificationItem] = Field(default_factory=list)
     publications: List[str] = Field(default_factory=list)
     document_type: Literal["resume", "cv"] = "resume"
+    raw_text: Optional[str] = ""
+    additional_sections: Dict[str, Any] = Field(default_factory=dict)
+
 
 
 class JobInput(BaseModel):
@@ -97,11 +100,30 @@ class AlignmentReport(BaseModel):
     overall_status: Literal["PASSED", "REJECTED"] = "PASSED"
 
 
+class TemplateConfig(BaseModel):
+    template_id: str = "modern"
+    primary_color: str = "#0284c7"
+    accent_color: str = "#0369a1"
+    text_color: str = "#0f172a"
+    font_family: str = "system-ui, -apple-system, sans-serif"
+    font_size: str = "14px"
+    line_height: str = "1.5"
+    density: Literal["compact", "normal", "comfortable"] = "normal"
+    header_layout: Literal["left", "center", "split"] = "left"
+    show_tagline: bool = True
+    show_icons: bool = True
+    show_projects: bool = True
+    show_certifications: bool = True
+    show_education: bool = True
+    custom_css: Optional[str] = ""
+
+
 class StreamRequest(BaseModel):
     job_input: JobInput
     llm_config: Optional[LLMConfig] = Field(default_factory=LLMConfig)
     base_resume: Optional[ResumeData] = None
     template_id: Optional[str] = "modern"
+    template_config: Optional[TemplateConfig] = None
 
 
 class RenderRequest(BaseModel):
@@ -109,3 +131,4 @@ class RenderRequest(BaseModel):
     template_id: str = "modern"
     highlight_diff: bool = False
     base_resume: Optional[ResumeData] = None
+    template_config: Optional[TemplateConfig] = None

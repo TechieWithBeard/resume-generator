@@ -456,6 +456,19 @@ class GeneratorChain:
                     if kw.lower() in h.lower():
                         candidate_skills.add(kw.lower())
 
+        # Also collect competencies mentioned anywhere in candidate's complete Base Knowledge
+        corpus_parts = [base.raw_text or "", base.summary or ""]
+        for p in (base.projects or []):
+            corpus_parts.extend([p.name, p.description] + p.technologies)
+        for c in (base.certifications or []):
+            corpus_parts.extend([c.name, c.issuer])
+
+        full_corpus = " ".join(corpus_parts).lower()
+        for kw in keywords:
+            kw_low = kw.lower().strip()
+            if kw_low and re.search(rf"\b{re.escape(kw_low)}\b", full_corpus):
+                candidate_skills.add(kw_low)
+
         direct_matches = []
         transferable = []
         unmatched = []

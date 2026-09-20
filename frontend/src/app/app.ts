@@ -6,6 +6,7 @@ import { StreamConsoleComponent } from './components/stream-console/stream-conso
 import { ResumePreviewComponent } from './components/resume-preview/resume-preview.component';
 import { BaseResumeModalComponent } from './components/base-resume-modal/base-resume-modal.component';
 import { SettingsDrawerComponent } from './components/settings-drawer/settings-drawer.component';
+import { TemplateConfigModalComponent } from './components/template-config-modal/template-config-modal.component';
 
 @Component({
   selector: 'app-root',
@@ -18,6 +19,7 @@ import { SettingsDrawerComponent } from './components/settings-drawer/settings-d
     ResumePreviewComponent,
     BaseResumeModalComponent,
     SettingsDrawerComponent,
+    TemplateConfigModalComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',

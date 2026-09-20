@@ -9,7 +9,7 @@ Embedded print styles ensure pixel-perfect PDF export via browser print engine.
 
 import re
 from typing import Any, Dict, List, Optional
-from backend.app.models.resume import ResumeData
+from backend.app.models.resume import ResumeData, TemplateConfig
 
 
 class TemplateEngine:
@@ -43,29 +43,101 @@ class TemplateEngine:
     def list_templates(self) -> List[Dict[str, Any]]:
         return self.TEMPLATES
 
+    def _build_dynamic_styles(self, config: Optional[TemplateConfig]) -> str:
+        if not config:
+            return ""
+        
+        density = config.density
+        if density == "compact":
+            padding = "28px 36px"
+            section_margin = "14px"
+            item_margin = "10px"
+            bullet_margin = "2px"
+            line_height = config.line_height or "1.35"
+        elif density == "comfortable":
+            padding = "54px 58px"
+            section_margin = "26px"
+            item_margin = "18px"
+            bullet_margin = "6px"
+            line_height = config.line_height or "1.65"
+        else: # normal
+            padding = "44px 48px"
+            section_margin = "20px"
+            item_margin = "14px"
+            bullet_margin = "4px"
+            line_height = config.line_height or "1.5"
+
+        header_css = ""
+        if config.header_layout == "center":
+            header_css = """
+            .header { text-align: center !important; }
+            .contacts { justify-content: center !important; text-align: center !important; display: flex !important; flex-wrap: wrap !important; }
+            .title-tagline { text-align: center !important; }
+            """
+        elif config.header_layout == "split":
+            header_css = """
+            .header { display: flex !important; justify-content: space-between !important; align-items: flex-end !important; flex-wrap: wrap !important; gap: 12px !important; }
+            .contacts { text-align: right !important; }
+            """
+
+        return f"""
+        /* User Configured Dynamic Overrides */
+        :root {{
+            --primary-color: {config.primary_color} !important;
+            --accent-color: {config.accent_color} !important;
+            --text-primary: {config.text_color} !important;
+            --font-family: {config.font_family} !important;
+            --font-size: {config.font_size} !important;
+            --line-height: {line_height} !important;
+        }}
+        body {{
+            font-family: var(--font-family) !important;
+            font-size: var(--font-size) !important;
+            line-height: var(--line-height) !important;
+            color: var(--text-primary) !important;
+        }}
+        .resume-paper {{
+            padding: {padding} !important;
+        }}
+        .section, .cv-section {{
+            margin-bottom: {section_margin} !important;
+        }}
+        .experience-entry, .project-card, .cv-project-card, .education-entry, .edu-item, .cv-entry {{
+            margin-bottom: {item_margin} !important;
+        }}
+        .exp-highlights li, .project-highlights li {{
+            margin-bottom: {bullet_margin} !important;
+        }}
+        {header_css}
+        {config.custom_css or ""}
+        """
+
     def render(
         self,
         resume: ResumeData,
         template_id: str = "modern",
         highlight_diff: bool = False,
         base_resume: Optional[ResumeData] = None,
+        config: Optional[TemplateConfig] = None,
     ) -> str:
         """Renders the resume or CV data into a standalone, printable HTML document."""
         doc_type = getattr(resume, "document_type", "resume")
-        if template_id == "cv_executive" or (doc_type == "cv" and template_id in ("modern", "default")):
-            return self._render_cv_executive(resume, highlight_diff, base_resume)
-        elif template_id == "executive":
-            return self._render_executive(resume, highlight_diff, base_resume)
-        elif template_id == "compact":
-            return self._render_compact(resume, highlight_diff, base_resume)
+        effective_tmpl = (config.template_id if config and config.template_id else template_id)
+        if effective_tmpl == "cv_executive" or (doc_type == "cv" and effective_tmpl in ("modern", "default")):
+            return self._render_cv_executive(resume, highlight_diff, base_resume, config=config)
+        elif effective_tmpl == "executive":
+            return self._render_executive(resume, highlight_diff, base_resume, config=config)
+        elif effective_tmpl == "compact":
+            return self._render_compact(resume, highlight_diff, base_resume, config=config)
         else:
-            return self._render_modern(resume, highlight_diff, base_resume)
+            return self._render_modern(resume, highlight_diff, base_resume, config=config)
 
     def _render_modern(
         self,
         resume: ResumeData,
         highlight_diff: bool = False,
         base_resume: Optional[ResumeData] = None,
+        config: Optional[TemplateConfig] = None,
     ) -> str:
         base_highlights = set()
         if highlight_diff and base_resume:
@@ -73,18 +145,25 @@ class TemplateEngine:
                 for h in exp.highlights:
                     base_highlights.add(h.strip().lower())
 
+        use_icons = config.show_icons if config is not None else True
+        icon_email = "✉ " if use_icons else ""
+        icon_phone = "☎ " if use_icons else ""
+        icon_loc = "📍 " if use_icons else ""
+        icon_linkedin = "🔗 " if use_icons else ""
+        icon_github = "💻 " if use_icons else ""
+
         # Contact items
         contacts = []
         if resume.email:
-            contacts.append(f'<span class="contact-item">✉ {resume.email}</span>')
+            contacts.append(f'<span class="contact-item">{icon_email}{resume.email}</span>')
         if resume.phone:
-            contacts.append(f'<span class="contact-item">☎ {resume.phone}</span>')
+            contacts.append(f'<span class="contact-item">{icon_phone}{resume.phone}</span>')
         if resume.location:
-            contacts.append(f'<span class="contact-item">📍 {resume.location}</span>')
+            contacts.append(f'<span class="contact-item">{icon_loc}{resume.location}</span>')
         if resume.linkedin:
-            contacts.append(f'<a href="{resume.linkedin}" target="_blank" class="contact-item">🔗 LinkedIn</a>')
+            contacts.append(f'<a href="{resume.linkedin}" target="_blank" class="contact-item">{icon_linkedin}LinkedIn</a>')
         if resume.github:
-            contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item">💻 GitHub</a>')
+            contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item">{icon_github}GitHub</a>')
         contact_html = " &bull; ".join(contacts)
 
         # Experience items
@@ -128,19 +207,49 @@ class TemplateEngine:
             </div>
             """
 
+        # Projects
+        projects_html = ""
+        show_proj = config.show_projects if config is not None else True
+        if show_proj and getattr(resume, "projects", None):
+            for proj in resume.projects:
+                tech_badges = "".join([f'<span class="tech-badge" style="background:#f1f5f9; color:#334155; padding:2px 6px; border-radius:3px; font-size:8pt; margin-right:4px;">{t}</span>' for t in proj.technologies])
+                url_link = f' <a href="{proj.url}" target="_blank" style="color:var(--accent-color); text-decoration:none; font-size:8pt;">🔗</a>' if proj.url else ''
+                period_str = f'<span class="exp-period">{proj.period}</span>' if proj.period else ''
+                projects_html += f"""
+                <div class="experience-entry">
+                    <div class="exp-header">
+                        <span class="exp-role">{proj.name}{url_link}</span>
+                        {period_str}
+                    </div>
+                    <div class="summary-text" style="margin-bottom: 4px;">{proj.description}</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">{tech_badges}</div>
+                </div>
+                """
+
         # Education
         edu_html = ""
-        for edu in resume.education:
-            edu_html += f"""
-            <div class="education-entry">
-                <div class="edu-degree-inst">
-                    <span class="edu-degree">{edu.degree}</span>
-                    <span class="edu-sep">—</span>
-                    <span class="edu-inst">{edu.institution}</span>
+        show_edu = config.show_education if config is not None else True
+        if show_edu and resume.education:
+            for edu in resume.education:
+                edu_html += f"""
+                <div class="education-entry">
+                    <div class="edu-degree-inst">
+                        <span class="edu-degree">{edu.degree}</span>
+                        <span class="edu-sep">—</span>
+                        <span class="edu-inst">{edu.institution}</span>
+                    </div>
+                    <span class="edu-period">{edu.period}</span>
                 </div>
-                <span class="edu-period">{edu.period}</span>
-            </div>
-            """
+                """
+
+        # Certifications
+        cert_html = ""
+        show_cert = config.show_certifications if config is not None else True
+        if show_cert and getattr(resume, "certifications", None):
+            for cert in resume.certifications:
+                yr = f" ({cert.year})" if cert.year else ""
+                url_str = f' <a href="{cert.url}" target="_blank" style="color:var(--accent-color); text-decoration:none;">🔗</a>' if cert.url else ""
+                cert_html += f'<div class="education-entry"><span class="edu-degree">{cert.name}</span><span class="edu-inst">{cert.issuer}{yr}{url_str}</span></div>'
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -348,13 +457,14 @@ class TemplateEngine:
       size: letter portrait;
     }}
   }}
+  {self._build_dynamic_styles(config)}
 </style>
 </head>
 <body>
 <div class="resume-paper">
   <div class="header">
     <div class="name">{resume.name}</div>
-    <div class="title-tagline">{resume.title} {f"• {resume.tagline}" if resume.tagline else ""}</div>
+    {f'<div class="title-tagline">{resume.title}' + (f' • {resume.tagline}' if (config is None or config.show_tagline) and resume.tagline else '') + '</div>' if resume.title else ''}
     <div class="contacts">{contact_html}</div>
   </div>
 
@@ -373,10 +483,11 @@ class TemplateEngine:
     {exp_html}
   </div>
 
-  <div class="section">
-    <div class="section-title">Education</div>
-    {edu_html}
-  </div>
+  {f'<div class="section"><div class="section-title">Key Projects & Architecture</div>{projects_html}</div>' if projects_html else ''}
+
+  {f'<div class="section"><div class="section-title">Education</div>{edu_html}</div>' if edu_html else ''}
+
+  {f'<div class="section"><div class="section-title">Certifications & Credentials</div>{cert_html}</div>' if cert_html else ''}
 </div>
 </body>
 </html>
@@ -387,6 +498,7 @@ class TemplateEngine:
         resume: ResumeData,
         highlight_diff: bool = False,
         base_resume: Optional[ResumeData] = None,
+        config: Optional[TemplateConfig] = None,
     ) -> str:
         # High contrast, traditional serif/sans ATS compliant
         contacts = [c for c in [resume.email, resume.phone, resume.location, resume.linkedin, resume.github] if c]
@@ -397,7 +509,7 @@ class TemplateEngine:
             bullets = "".join([f"<li>{h}</li>" for h in exp.highlights])
             loc = f" — {exp.location}" if exp.location else ""
             exp_html += f"""
-            <div style="margin-bottom: 14px; break-inside: avoid;">
+            <div class="experience-entry" style="margin-bottom: 14px; break-inside: avoid;">
               <div style="display: flex; justify-content: space-between; font-weight: bold;">
                 <span>{exp.role}</span>
                 <span>{exp.period}</span>
@@ -413,14 +525,40 @@ class TemplateEngine:
             skills_lines.append(f"<strong>{cat_label}:</strong> " + ", ".join(items))
         skills_html = "<br>".join(skills_lines)
 
+        projects_html = ""
+        show_proj = config.show_projects if config is not None else True
+        if show_proj and getattr(resume, "projects", None):
+            for proj in resume.projects:
+                techs = f" — <em>{', '.join(proj.technologies)}</em>" if proj.technologies else ""
+                url_s = f' <a href="{proj.url}" target="_blank">🔗</a>' if proj.url else ""
+                period_s = f" ({proj.period})" if proj.period else ""
+                projects_html += f"""
+                <div class="project-card" style="margin-bottom: 10px;">
+                  <div><strong>{proj.name}</strong>{period_s}{url_s}{techs}</div>
+                  <p style="font-size: 9.5pt; margin: 2px 0 6px 0;">{proj.description}</p>
+                </div>
+                """
+
         edu_html = ""
-        for edu in resume.education:
-            edu_html += f"""
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10pt;">
-              <span><strong>{edu.degree}</strong>, {edu.institution}</span>
-              <span>{edu.period}</span>
-            </div>
-            """
+        show_edu = config.show_education if config is not None else True
+        if show_edu and resume.education:
+            for edu in resume.education:
+                edu_html += f"""
+                <div class="education-entry" style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10pt;">
+                  <span><strong>{edu.degree}</strong>, {edu.institution}</span>
+                  <span>{edu.period}</span>
+                </div>
+                """
+
+        cert_html = ""
+        show_cert = config.show_certifications if config is not None else True
+        if show_cert and getattr(resume, "certifications", None):
+            for cert in resume.certifications:
+                yr = f" ({cert.year})" if cert.year else ""
+                url_str = f' <a href="{cert.url}" target="_blank">🔗</a>' if cert.url else ""
+                cert_html += f'<div style="font-size: 9.5pt; margin-bottom: 4px;"><strong>{cert.name}</strong> — {cert.issuer}{yr}{url_str}</div>'
+
+        tagline_html = f" • {resume.tagline}" if (config is None or config.show_tagline) and resume.tagline else ""
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -429,31 +567,43 @@ class TemplateEngine:
 <title>{resume.name} - Executive Resume</title>
 <style>
   body {{ font-family: "Georgia", Times, serif; color: #111; line-height: 1.4; padding: 30px 20px; background: #fafafa; }}
-  .paper {{ max-width: 820px; margin: 0 auto; background: #fff; padding: 40px 50px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }}
-  h1 {{ text-align: center; font-size: 24pt; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }}
-  .title {{ text-align: center; font-size: 11pt; font-style: italic; margin-bottom: 4px; }}
+  .paper, .resume-paper {{ max-width: 820px; margin: 0 auto; background: #fff; padding: 40px 50px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }}
+  h1, .name {{ text-align: center; font-size: 24pt; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }}
+  .title, .title-tagline {{ text-align: center; font-size: 11pt; font-style: italic; margin-bottom: 4px; }}
   .contacts {{ text-align: center; font-size: 9.5pt; border-bottom: 1px solid #222; padding-bottom: 12px; margin-bottom: 18px; }}
-  .sec-heading {{ font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #aaa; padding-bottom: 2px; margin: 16px 0 10px 0; letter-spacing: 0.5px; }}
-  @media print {{ body {{ background: #fff; padding: 0; }} .paper {{ box-shadow: none; padding: 0; }} }}
+  .sec-heading, .section-title {{ font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #aaa; padding-bottom: 2px; margin: 16px 0 10px 0; letter-spacing: 0.5px; }}
+  @media print {{ body {{ background: #fff; padding: 0; }} .paper, .resume-paper {{ box-shadow: none; padding: 0; }} }}
+  {self._build_dynamic_styles(config)}
 </style>
 </head>
 <body>
-<div class="paper">
-  <h1>{resume.name}</h1>
-  <div class="title">{resume.title}</div>
-  <div class="contacts">{contact_html}</div>
+<div class="resume-paper">
+  <div class="header">
+    <h1 class="name">{resume.name}</h1>
+    <div class="title-tagline">{resume.title}{tagline_html}</div>
+    <div class="contacts">{contact_html}</div>
+  </div>
 
-  <div class="sec-heading">Summary</div>
-  <p style="font-size: 10pt; text-align: justify;">{resume.summary}</p>
+  <div class="section">
+    <div class="sec-heading">Summary</div>
+    <p style="font-size: 10pt; text-align: justify;">{resume.summary}</p>
+  </div>
 
-  <div class="sec-heading">Core Competencies</div>
-  <div style="font-size: 10pt;">{skills_html}</div>
+  <div class="section">
+    <div class="sec-heading">Core Competencies</div>
+    <div style="font-size: 10pt;">{skills_html}</div>
+  </div>
 
-  <div class="sec-heading">Professional Experience</div>
-  {exp_html}
+  <div class="section">
+    <div class="sec-heading">Professional Experience</div>
+    {exp_html}
+  </div>
 
-  <div class="sec-heading">Education</div>
-  {edu_html}
+  {f'<div class="section"><div class="sec-heading">Key Projects & Architecture</div>{projects_html}</div>' if projects_html else ''}
+
+  {f'<div class="section"><div class="sec-heading">Education</div>{edu_html}</div>' if edu_html else ''}
+
+  {f'<div class="section"><div class="sec-heading">Certifications & Credentials</div>{cert_html}</div>' if cert_html else ''}
 </div>
 </body>
 </html>
@@ -464,6 +614,7 @@ class TemplateEngine:
         resume: ResumeData,
         highlight_diff: bool = False,
         base_resume: Optional[ResumeData] = None,
+        config: Optional[TemplateConfig] = None,
     ) -> str:
         base_highlights = set()
         if highlight_diff and base_resume:
@@ -843,42 +994,40 @@ class TemplateEngine:
       size: A4 portrait;
     }}
   }}
+  {self._build_dynamic_styles(config)}
 </style>
 </head>
 <body>
-<div class="paper">
+<div class="resume-paper paper">
   <div class="header">
     <div class="cv-badge">Curriculum Vitae</div>
     <h1 class="name">{resume.name}</h1>
-    <div class="title-tagline">{resume.title}</div>
+    <div class="title-tagline">{resume.title}{f" • {resume.tagline}" if (config is None or config.show_tagline) and resume.tagline else ""}</div>
     <div class="contacts">{contact_html}</div>
   </div>
 
-  <div class="cv-section">
+  <div class="cv-section section">
     <div class="section-title">Executive Career Architecture & Profile</div>
     <p class="summary-text">{resume.summary}</p>
   </div>
 
-  <div class="cv-section">
+  <div class="cv-section section">
     <div class="section-title">Comprehensive Technical Taxonomy & Skills</div>
     {skills_html}
   </div>
 
-  <div class="cv-section">
+  <div class="cv-section section">
     <div class="section-title">Professional Experience & Career History</div>
     {exp_html}
   </div>
 
-  {projects_html}
+  {projects_html if (config is None or config.show_projects) else ''}
 
-  {certs_html}
+  {certs_html if (config is None or config.show_certifications) else ''}
 
   {pub_html}
 
-  <div class="cv-section">
-    <div class="section-title">Education & Academic Background</div>
-    {edu_html}
-  </div>
+  {f'<div class="cv-section section"><div class="section-title">Education & Academic Background</div>{edu_html}</div>' if (config is None or config.show_education) and edu_html else ''}
 </div>
 </body>
 </html>
@@ -889,10 +1038,12 @@ class TemplateEngine:
         resume: ResumeData,
         highlight_diff: bool = False,
         base_resume: Optional[ResumeData] = None,
+        config: Optional[TemplateConfig] = None,
     ) -> str:
         # Compact single/two page layout
-        return self._render_modern(resume, highlight_diff, base_resume)
+        cfg = config.model_copy() if config else TemplateConfig(template_id="compact", density="compact")
+        cfg.density = "compact"
+        return self._render_modern(resume, highlight_diff, base_resume, config=cfg)
 
 
 template_engine = TemplateEngine()
-

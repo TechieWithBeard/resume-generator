@@ -6,6 +6,7 @@ import {
   LLMConfig,
   ResumeData,
   ResumeTemplate,
+  TemplateConfig,
   ThoughtLog,
 } from '../models/resume.models';
 
@@ -37,6 +38,36 @@ export class ResumeGeneratorService {
   readonly documentMode = signal<'resume' | 'cv'>('resume');
   readonly comparisonMode = signal<boolean>(false);
 
+  readonly defaultTemplateConfig: TemplateConfig = {
+    template_id: 'modern',
+    primary_color: '#0284c7',
+    accent_color: '#0369a1',
+    text_color: '#0f172a',
+    font_family: 'system-ui, -apple-system, sans-serif',
+    font_size: '14px',
+    line_height: '1.5',
+    density: 'normal',
+    header_layout: 'left',
+    show_tagline: true,
+    show_icons: true,
+    show_projects: true,
+    show_certifications: true,
+    show_education: true,
+  };
+
+  private loadInitialTemplateConfig(): TemplateConfig {
+    try {
+      const saved = localStorage.getItem('resume_template_config');
+      if (saved) {
+        return { ...this.defaultTemplateConfig, ...JSON.parse(saved) };
+      }
+    } catch (_) {}
+    return { ...this.defaultTemplateConfig };
+  }
+
+  readonly templateConfig = signal<TemplateConfig>(this.loadInitialTemplateConfig());
+  readonly showTemplateConfigModal = signal<boolean>(false);
+
   readonly llmConfig = signal<LLMConfig>({
     provider: 'auto',
     model_name: 'llama3.1:8b',
@@ -56,6 +87,7 @@ export class ResumeGeneratorService {
   async init() {
     await this.loadBaseResume();
     await this.loadTemplates();
+    await this.loadTemplateConfig();
   }
 
   async loadBaseResume(): Promise<void> {
@@ -122,6 +154,7 @@ export class ResumeGeneratorService {
         filename: file.name,
         file_data: base64Content,
         save: autoSave,
+        llm_config: this.llmConfig(),
       };
 
       const res = await fetch(`${this.API_BASE}/api/resume/upload`, {
@@ -129,6 +162,7 @@ export class ResumeGeneratorService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
 
       const data = await res.json();
       if (res.ok && data.success) {
@@ -170,6 +204,59 @@ export class ResumeGeneratorService {
     }
   }
 
+  async loadTemplateConfig(): Promise<void> {
+    try {
+      const res = await fetch(`${this.API_BASE}/api/template/config`);
+      if (res.ok) {
+        const data: TemplateConfig = await res.json();
+        this.templateConfig.set(data);
+        localStorage.setItem('resume_template_config', JSON.stringify(data));
+      }
+    } catch (err) {
+      console.warn('Could not fetch template config from server, using local defaults:', err);
+    }
+  }
+
+  async saveTemplateConfig(cfg: TemplateConfig): Promise<void> {
+    this.templateConfig.set(cfg);
+    localStorage.setItem('resume_template_config', JSON.stringify(cfg));
+    try {
+      await fetch(`${this.API_BASE}/api/template/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cfg),
+      });
+    } catch (err) {
+      console.warn('Failed to sync template config to server:', err);
+    }
+    const active = this.activeResume();
+    if (active) {
+      await this.renderResume(active, cfg.template_id || this.selectedTemplate(), this.comparisonMode());
+    }
+  }
+
+  async renderPreviewWithConfig(resume: ResumeData, templateId: string, cfg: TemplateConfig): Promise<string> {
+    try {
+      const res = await fetch(`${this.API_BASE}/api/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resume,
+          template_id: templateId,
+          highlight_diff: false,
+          base_resume: this.baseResume(),
+          template_config: cfg,
+        }),
+      });
+      if (res.ok) {
+        return await res.text();
+      }
+    } catch (err) {
+      console.error('Failed to render preview with config:', err);
+    }
+    return '';
+  }
+
   async renderResume(resume: ResumeData, templateId: string, highlightDiff: boolean): Promise<void> {
     try {
       const res = await fetch(`${this.API_BASE}/api/render`, {
@@ -180,6 +267,7 @@ export class ResumeGeneratorService {
           template_id: templateId,
           highlight_diff: highlightDiff,
           base_resume: this.baseResume(),
+          template_config: this.templateConfig(),
         }),
       });
       if (res.ok) {
@@ -193,6 +281,8 @@ export class ResumeGeneratorService {
 
   async selectTemplate(templateId: string): Promise<void> {
     this.selectedTemplate.set(templateId);
+    const cfg = { ...this.templateConfig(), template_id: templateId };
+    this.templateConfig.set(cfg);
     const active = this.activeResume();
     if (active) {
       await this.renderResume(active, templateId, this.comparisonMode());

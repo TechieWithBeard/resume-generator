@@ -41,4 +41,8 @@ export class ResumePreviewComponent {
   onDownloadJson(): void {
     this.resumeService.downloadJson();
   }
+
+  onOpenTemplateStudio(): void {
+    this.resumeService.showTemplateConfigModal.set(true);
+  }
 }

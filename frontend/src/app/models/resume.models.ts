@@ -54,7 +54,10 @@ export interface ResumeData {
   certifications?: CertificationItem[];
   publications?: string[];
   document_type?: 'resume' | 'cv';
+  raw_text?: string;
+  additional_sections?: Record<string, any>;
 }
+
 
 export interface JobInput {
   job_description?: string;
@@ -102,4 +105,22 @@ export interface ResumeTemplate {
   name: string;
   description: string;
   is_default: boolean;
+}
+
+export interface TemplateConfig {
+  template_id: string;
+  primary_color: string;
+  accent_color: string;
+  text_color: string;
+  font_family: string;
+  font_size: string;
+  line_height: string;
+  density: 'compact' | 'normal' | 'comfortable';
+  header_layout: 'left' | 'center' | 'split';
+  show_tagline: boolean;
+  show_icons: boolean;
+  show_projects: boolean;
+  show_certifications: boolean;
+  show_education: boolean;
+  custom_css?: string;
 }

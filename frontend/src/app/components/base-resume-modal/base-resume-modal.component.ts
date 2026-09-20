@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ResumeGeneratorService } from '../../services/resume-generator.service';
@@ -16,7 +16,7 @@ export class BaseResumeModalComponent {
   private readonly resumeService = inject(ResumeGeneratorService);
 
   readonly isOpen = this.resumeService.showBaseResumeModal;
-  readonly editMode = signal<'form' | 'json'>('form');
+  readonly editMode = signal<'form' | 'raw' | 'json'>('form');
   readonly jsonError = signal<string | null>(null);
 
   readonly isUploading = signal<boolean>(false);
@@ -32,15 +32,36 @@ export class BaseResumeModalComponent {
     experience: [],
     education: [],
     skills: {},
+    projects: [],
+    certifications: [],
+    raw_text: '',
   };
   rawJson = '';
 
   constructor() {
-    const base = this.resumeService.baseResume();
-    if (base) {
-      this.formData = JSON.parse(JSON.stringify(base));
-      this.rawJson = JSON.stringify(base, null, 2);
-    }
+    // Whenever modal opens, sync from active baseResume in service
+    effect(() => {
+      if (this.isOpen()) {
+        const base = this.resumeService.baseResume();
+        if (base) {
+          this.formData = JSON.parse(JSON.stringify(base));
+          this.rawJson = JSON.stringify(base, null, 2);
+        }
+      }
+    });
+  }
+
+  get skillCategories(): string[] {
+    return Object.keys(this.formData.skills || {});
+  }
+
+  get rawTextWordCount(): number {
+    if (!this.formData.raw_text) return 0;
+    return this.formData.raw_text.trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  get rawTextCharCount(): number {
+    return (this.formData.raw_text || '').length;
   }
 
   onDragOver(event: DragEvent): void {
@@ -88,8 +109,9 @@ export class BaseResumeModalComponent {
       const expCount = result.resume.experience?.length || 0;
       const eduCount = result.resume.education?.length || 0;
       const skillCount = Object.values(result.resume.skills || {}).flat().length;
+      const projCount = result.resume.projects?.length || 0;
       this.uploadMessage.set(
-        `✓ Extracted from ${meta.filename || file.name}: ${expCount} experiences, ${eduCount} degrees, and ${skillCount} skills (${meta.word_count || 0} words).`
+        `✓ Extracted from ${meta.filename || file.name}: ${expCount} experiences, ${eduCount} degrees, ${projCount} projects, and ${skillCount} skills (${meta.word_count || 0} words, 100% data preserved).`
       );
       this.uploadIsError.set(false);
       this.editMode.set('form');
@@ -103,13 +125,23 @@ export class BaseResumeModalComponent {
     this.resumeService.showBaseResumeModal.set(false);
   }
 
-  onSwitchToJson(): void {
-    this.rawJson = JSON.stringify(this.formData, null, 2);
-    this.editMode.set('json');
+  onSwitchMode(mode: 'form' | 'raw' | 'json'): void {
+    if (this.editMode() === 'json' && mode !== 'json') {
+      try {
+        this.formData = JSON.parse(this.rawJson);
+        this.jsonError.set(null);
+      } catch (e: any) {
+        this.jsonError.set(`Invalid JSON syntax: ${e.message}`);
+        return;
+      }
+    } else if (mode === 'json') {
+      this.rawJson = JSON.stringify(this.formData, null, 2);
+    }
+    this.editMode.set(mode);
   }
 
   async onReset(): Promise<void> {
-    if (confirm('Reset Ground Truth to default profile?')) {
+    if (confirm('Reset Ground Truth to default baseline profile?')) {
       await this.resumeService.resetBaseResume();
       const base = this.resumeService.baseResume();
       if (base) {

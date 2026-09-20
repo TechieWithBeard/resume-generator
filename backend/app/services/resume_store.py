@@ -7,12 +7,13 @@ import json
 import os
 from pathlib import Path
 from typing import Optional
-from backend.app.models.resume import ResumeData
+from backend.app.models.resume import ResumeData, TemplateConfig
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 DEFAULT_BASE_PATH = DATA_DIR / "default_base_resume.json"
 SAMPLE_RESUME_PATH = DATA_DIR / "sample_resume.json"
 USER_PERSISTED_PATH = DATA_DIR / "my_resume.json"
+TEMPLATE_CONFIG_PATH = DATA_DIR / "template_config.json"
 
 
 class ResumeStore:
@@ -42,6 +43,9 @@ class ResumeStore:
                 try:
                     with open(path, "r", encoding="utf-8") as f:
                         data = json.load(f)
+                    # Ignore empty placeholder files
+                    if not data.get("name") and not data.get("experience"):
+                        continue
                     self._cached_resume = ResumeData.model_validate(data)
                     return self._cached_resume
                 except Exception as e:
@@ -70,6 +74,33 @@ class ResumeStore:
         self._cached_resume = None
         return self.get_base_resume()
 
+    def get_template_config(self) -> TemplateConfig:
+        """Retrieves user's persisted template configuration or default settings."""
+        if TEMPLATE_CONFIG_PATH.is_file():
+            try:
+                with open(TEMPLATE_CONFIG_PATH, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return TemplateConfig.model_validate(data)
+            except Exception as e:
+                print(f"Warning: Failed to load template config from {TEMPLATE_CONFIG_PATH}: {e}")
+        return TemplateConfig()
+
+    def save_template_config(self, config: TemplateConfig) -> TemplateConfig:
+        """Persists template configuration to data/template_config.json."""
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with open(TEMPLATE_CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(config.model_dump(), f, indent=2)
+        return config
+
+    def reset_template_config(self) -> TemplateConfig:
+        """Resets template configuration back to system defaults."""
+        if TEMPLATE_CONFIG_PATH.exists():
+            try:
+                TEMPLATE_CONFIG_PATH.unlink()
+            except Exception:
+                pass
+        return TemplateConfig()
+
     def get_sample_resume(self) -> ResumeData:
         """Returns the generic sample resume."""
         if SAMPLE_RESUME_PATH.is_file():
@@ -77,7 +108,6 @@ class ResumeStore:
                 data = json.load(f)
             return ResumeData.model_validate(data)
         
-        # Absolute minimal fallback
         return ResumeData(
             name="Sample Candidate",
             title="Senior Software Engineer",

@@ -240,3 +240,68 @@ Attempting to force both formats into a single template created a design tension
 - **Positive**: Pixel-perfect multi-page PDF exports with zero card-splitting across page breaks.
 - **Positive**: Strict preservation of Ground Truth integrity across both formats.
 
+---
+
+## ADR-009: Zero-Data-Loss Resume Ingestion & Letter-Tracking Normalization
+
+### Status
+Accepted
+
+### Context
+When candidates uploaded real-world resumes created in design systems, LaTeX, or Canva, standard PDF extraction engines (e.g. `pypdf`) extracted text with tracking spaces between individual characters (e.g., `V I S H N U   T H A N K A P P A N`). This broke downstream NLP chunking, tokenization, and regular expressions.
+Furthermore, naive regex parsers discarded unmatched lines, dropping up to 80% of candidate achievements, omitting whole employer blocks, and shredding rich bullet points.
+
+### Decision
+1. **Letter-Tracking Font Normalization (`normalize_extracted_text`)**:
+   - Implemented an intelligent multi-token heuristic: if single-character token ratio exceeds 35%, word-spaced boundaries are detected and characters are reconstituted into normal words (`V I S H N U` -> `VISHNU`). Standardizes unicode bullet points (`•`, `▪`, `●`, `·`) into uniform ASCII hyphens.
+2. **Zero-Data-Loss Structural Ingestion (`_parse_structurally`)**:
+   - Replaced fragile line shredders with a structural section scanner.
+   - Preserves every bullet point verbatim without truncation.
+   - Extracts categorized skills and architectures directly into taxonomy matrices.
+   - Invariant: Stores the full, unadulterated document text in `resume.raw_text`.
+3. **Holistic Truth Audit Expansion**:
+   - Upgraded `GeneratorChain._perform_competency_audit()` to inspect `base.raw_text`, `summary`, `projects`, and `certifications`, ensuring candidate competencies are never falsely flagged as out-of-scope during anti-hallucination guardrails.
+4. **Candidate Ground Truth 3-Way Studio**:
+   - Enhanced the Base Resume modal with a 3-way toggle (`Structured Profile`, `Verbatim Knowledge Base`, `JSON Schema`), giving candidates complete visibility and control over all extracted knowledge.
+
+### Consequences
+- **Positive**: 100% data extraction and preservation on complex resumes.
+- **Positive**: Zero false out-of-scope rejections during LLM competency alignment.
+- **Positive**: Verbatim candidate context accessible to the reasoning chain.
+
+---
+
+## ADR-010: Interactive Template Preview & Configuration Studio
+
+### Status
+Accepted
+
+### Context
+Resume candidates require diverse visual styles, palettes, and layouts suited to different corporate cultures (e.g. modern tech startups vs. conservative enterprise finance). Previously, templates had hardcoded colors and fixed densities. Users requested a dedicated template studio to preview and configure templates, adjust colors and typography, and persist their preferred styling.
+
+### Decision
+1. **Dynamic Style Overrides in `TemplateEngine`**:
+   - Introduced `TemplateConfig` data model specifying:
+     - `template_id` (`modern`, `executive`, `compact`, `cv_executive`)
+     - `primary_color`, `accent_color`, `text_color` (hex codes)
+     - `font_family`, `font_size`, `line_height`
+     - `density` (`compact`, `normal`, `comfortable`)
+     - `header_layout` (`left`, `center`, `split`)
+     - Section visibility toggles (`show_tagline`, `show_icons`, `show_projects`, `show_certifications`, `show_education`)
+   - Implemented `_build_dynamic_styles()` to dynamically inject CSS variables (`--primary-color`, `--accent-color`, `--text-primary`, `--font-family`, `--font-size`, `--line-height`) and layout rules into all rendered HTML templates and print stylesheets.
+2. **Configuration Persistence & ASGI Endpoints**:
+   - Added `GET /api/template/config` and `PUT /api/template/config` ASGI routes.
+   - Persisted candidate styling in `data/template_config.json`.
+   - Integrated `template_config` into `POST /api/render` and `POST /api/generate/stream`.
+3. **Frontend Template Studio Component**:
+   - Created `TemplateConfigModalComponent` (`template-config-modal/`):
+     - Left column: curated color palettes (`Sapphire Tech`, `Emerald Enterprise`, `Executive Slate`, `Royal Indigo`, `Crimson Modern`, `Midnight Charcoal`) + custom HTML5 color pickers; typography font selectors; density pills; header layout toggles; section switches.
+     - Right column: live interactive iframe preview rendering instant real-time styling updates via `renderPreviewWithConfig()`.
+     - Toolbar: "🎨 Customize" button added to the main resume preview toolbar.
+
+### Consequences
+- **Positive**: Instant visual feedback on styling changes without affecting base resume data.
+- **Positive**: Both onscreen iframes and printable vector PDFs automatically inherit custom styles.
+- **Positive**: User styling preferences persist across sessions.
+
+

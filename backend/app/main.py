@@ -18,6 +18,7 @@ from backend.app.models.resume import (
     RenderRequest,
     ResumeData,
     StreamRequest,
+    TemplateConfig,
 )
 from backend.app.services.generator_chain import generator_chain
 from backend.app.services.linkedin_extractor import linkedin_extractor
@@ -136,6 +137,7 @@ async def app(scope, receive, send):
         file_bytes = b""
         filename = "uploaded_resume.txt"
         auto_save = False
+        llm_config = LLMConfig(provider="auto")
 
         if "multipart/form-data" in ct:
             try:
@@ -159,6 +161,10 @@ async def app(scope, receive, send):
                 data = json.loads(raw.decode("utf-8"))
                 filename = data.get("filename", "resume.txt")
                 auto_save = bool(data.get("save", False))
+                llm_cfg_data = data.get("llm_config")
+                if llm_cfg_data:
+                    llm_config = LLMConfig.model_validate(llm_cfg_data)
+
                 if "file_data" in data and data["file_data"]:
                     b64_str = str(data["file_data"])
                     if "," in b64_str:
@@ -179,7 +185,7 @@ async def app(scope, receive, send):
             return
 
         try:
-            parsed_resume, metadata = await resume_parser.parse_resume(file_bytes, filename)
+            parsed_resume, metadata = await resume_parser.parse_resume(file_bytes, filename, config=llm_config)
             if auto_save:
                 resume_store.save_base_resume(parsed_resume)
                 metadata["saved_as_base"] = True
@@ -206,6 +212,25 @@ async def app(scope, receive, send):
         await send({"type": "http.response.body", "body": body})
         return
 
+    # Route: GET /api/template/config
+    if path == "/api/template/config" and method == "GET":
+        cfg = resume_store.get_template_config()
+        status, headers, body = send_json(cfg.model_dump())
+        await send({"type": "http.response.start", "status": status, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+        return
+
+    # Route: PUT /api/template/config
+    if path == "/api/template/config" and method == "PUT":
+        raw = await read_body(receive)
+        data = json.loads(raw.decode("utf-8"))
+        cfg = TemplateConfig.model_validate(data)
+        saved = resume_store.save_template_config(cfg)
+        status, headers, body = send_json(saved.model_dump())
+        await send({"type": "http.response.start", "status": status, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+        return
+
     # Route: POST /api/render
     if path == "/api/render" and method == "POST":
         raw = await read_body(receive)
@@ -216,6 +241,7 @@ async def app(scope, receive, send):
             template_id=req.template_id,
             highlight_diff=req.highlight_diff,
             base_resume=req.base_resume,
+            config=req.template_config,
         )
         status, headers, body = send_html(html)
         await send({"type": "http.response.start", "status": status, "headers": headers})
