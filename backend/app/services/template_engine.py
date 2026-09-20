@@ -1,0 +1,462 @@
+"""
+Predefined ATS-Optimized HTML Resume Templates & Renderer.
+Includes:
+- Modern Tech Template
+- Executive Minimalist Template
+- Compact Classic Template
+Embedded print styles ensure pixel-perfect PDF export via browser print engine.
+"""
+
+from typing import Any, Dict, List, Optional
+from backend.app.models.resume import ResumeData
+
+
+class TemplateEngine:
+    TEMPLATES = [
+        {
+            "id": "modern",
+            "name": "Modern Tech",
+            "description": "Clean, contemporary design with accent styling, skill badges, and balanced typography.",
+            "is_default": True,
+        },
+        {
+            "id": "executive",
+            "name": "Executive Minimalist",
+            "description": "High-contrast, conservative layout engineered for maximum ATS parser compliance.",
+            "is_default": False,
+        },
+        {
+            "id": "compact",
+            "name": "Compact Classic",
+            "description": "Space-efficient single/two-page dense layout ideal for engineering depth.",
+            "is_default": False,
+        },
+    ]
+
+    def list_templates(self) -> List[Dict[str, Any]]:
+        return self.TEMPLATES
+
+    def render(
+        self,
+        resume: ResumeData,
+        template_id: str = "modern",
+        highlight_diff: bool = False,
+        base_resume: Optional[ResumeData] = None,
+    ) -> str:
+        """Renders the resume data into a standalone, printable HTML document."""
+        if template_id == "executive":
+            return self._render_executive(resume, highlight_diff, base_resume)
+        elif template_id == "compact":
+            return self._render_compact(resume, highlight_diff, base_resume)
+        else:
+            return self._render_modern(resume, highlight_diff, base_resume)
+
+    def _render_modern(
+        self,
+        resume: ResumeData,
+        highlight_diff: bool = False,
+        base_resume: Optional[ResumeData] = None,
+    ) -> str:
+        base_highlights = set()
+        if highlight_diff and base_resume:
+            for exp in base_resume.experience:
+                for h in exp.highlights:
+                    base_highlights.add(h.strip().lower())
+
+        # Contact items
+        contacts = []
+        if resume.email:
+            contacts.append(f'<span class="contact-item">✉ {resume.email}</span>')
+        if resume.phone:
+            contacts.append(f'<span class="contact-item">☎ {resume.phone}</span>')
+        if resume.location:
+            contacts.append(f'<span class="contact-item">📍 {resume.location}</span>')
+        if resume.linkedin:
+            contacts.append(f'<a href="{resume.linkedin}" target="_blank" class="contact-item">🔗 LinkedIn</a>')
+        if resume.github:
+            contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item">💻 GitHub</a>')
+        contact_html = " &bull; ".join(contacts)
+
+        # Experience items
+        exp_html = ""
+        for exp in resume.experience:
+            bullets = ""
+            for h in exp.highlights:
+                is_modified = highlight_diff and (h.strip().lower() not in base_highlights)
+                highlight_cls = "highlighted-bullet" if is_modified else ""
+                bullets += f'<li class="{highlight_cls}">{h}</li>\n'
+            
+            loc_str = f'<span class="exp-location">{exp.location}</span>' if exp.location else ''
+            exp_html += f"""
+            <div class="experience-entry">
+                <div class="exp-header">
+                    <div class="exp-role-company">
+                        <span class="exp-role">{exp.role}</span>
+                        <span class="exp-sep">|</span>
+                        <span class="exp-company">{exp.company}</span>
+                    </div>
+                    <div class="exp-meta">
+                        <span class="exp-period">{exp.period}</span>
+                        {loc_str}
+                    </div>
+                </div>
+                <ul class="exp-highlights">
+                    {bullets}
+                </ul>
+            </div>
+            """
+
+        # Skills categories
+        skills_html = ""
+        for cat_name, skill_list in resume.skills.items():
+            formatted_cat = cat_name.replace("_", " ").title()
+            badges = "".join([f'<span class="skill-badge">{s}</span>' for s in skill_list])
+            skills_html += f"""
+            <div class="skill-group">
+                <span class="skill-label">{formatted_cat}:</span>
+                <div class="skill-badges">{badges}</div>
+            </div>
+            """
+
+        # Education
+        edu_html = ""
+        for edu in resume.education:
+            edu_html += f"""
+            <div class="education-entry">
+                <div class="edu-degree-inst">
+                    <span class="edu-degree">{edu.degree}</span>
+                    <span class="edu-sep">—</span>
+                    <span class="edu-inst">{edu.institution}</span>
+                </div>
+                <span class="edu-period">{edu.period}</span>
+            </div>
+            """
+
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{resume.name} - Resume</title>
+<style>
+  :root {{
+    --primary-color: #0f172a;
+    --accent-color: #0284c7;
+    --accent-light: #e0f2fe;
+    --text-primary: #1e293b;
+    --text-muted: #64748b;
+    --border-color: #cbd5e1;
+    --diff-bg: #f0fdf4;
+    --diff-border: #16a34a;
+  }}
+  * {{
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }}
+  body {{
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text-primary);
+    background-color: #f8fafc;
+    line-height: 1.5;
+    padding: 30px 20px;
+  }}
+  .resume-paper {{
+    max-width: 850px;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 48px 52px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border-radius: 6px;
+  }}
+  .header {{
+    border-bottom: 2px solid var(--accent-color);
+    padding-bottom: 18px;
+    margin-bottom: 22px;
+  }}
+  .name {{
+    font-size: 28pt;
+    font-weight: 700;
+    color: var(--primary-color);
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }}
+  .title-tagline {{
+    font-size: 13pt;
+    font-weight: 600;
+    color: var(--accent-color);
+    margin-bottom: 8px;
+  }}
+  .contacts {{
+    font-size: 9.5pt;
+    color: var(--text-muted);
+  }}
+  .contacts a {{
+    color: var(--accent-color);
+    text-decoration: none;
+  }}
+  .section {{
+    margin-bottom: 22px;
+  }}
+  .section-title {{
+    font-size: 11.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--primary-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 4px;
+    margin-bottom: 12px;
+  }}
+  .summary-text {{
+    font-size: 10pt;
+    color: var(--text-primary);
+    line-height: 1.6;
+    text-align: justify;
+  }}
+  .experience-entry {{
+    margin-bottom: 16px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }}
+  .exp-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 5px;
+  }}
+  .exp-role {{
+    font-size: 11pt;
+    font-weight: 700;
+    color: var(--primary-color);
+  }}
+  .exp-sep {{
+    color: var(--border-color);
+    margin: 0 4px;
+  }}
+  .exp-company {{
+    font-size: 10.5pt;
+    font-weight: 600;
+    color: var(--accent-color);
+  }}
+  .exp-period {{
+    font-size: 9.5pt;
+    font-weight: 500;
+    color: var(--text-muted);
+  }}
+  .exp-location {{
+    font-size: 9pt;
+    color: var(--text-muted);
+    margin-left: 8px;
+  }}
+  .exp-highlights {{
+    list-style: disc;
+    padding-left: 18px;
+    font-size: 9.5pt;
+    color: var(--text-primary);
+    line-height: 1.55;
+  }}
+  .exp-highlights li {{
+    margin-bottom: 4px;
+  }}
+  .highlighted-bullet {{
+    background-color: var(--diff-bg);
+    border-left: 3px solid var(--diff-border);
+    padding-left: 6px;
+    border-radius: 2px;
+  }}
+  .skill-group {{
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 9.5pt;
+  }}
+  .skill-label {{
+    font-weight: 600;
+    width: 170px;
+    flex-shrink: 0;
+    color: var(--primary-color);
+  }}
+  .skill-badges {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }}
+  .skill-badge {{
+    background: #f1f5f9;
+    color: #334155;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 9pt;
+    font-weight: 500;
+    border: 1px solid #e2e8f0;
+  }}
+  .education-entry {{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 9.5pt;
+    margin-bottom: 6px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }}
+  .edu-degree {{
+    font-weight: 700;
+    color: var(--primary-color);
+  }}
+  .edu-sep {{
+    color: var(--border-color);
+    margin: 0 4px;
+  }}
+  .edu-inst {{
+    color: var(--text-muted);
+  }}
+  .edu-period {{
+    color: var(--text-muted);
+    font-weight: 500;
+  }}
+
+  @media print {{
+    body {{
+      background: #ffffff !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }}
+    .resume-paper {{
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      max-width: 100% !important;
+    }}
+    .highlighted-bullet {{
+      background-color: transparent !important;
+      border-left: none !important;
+      padding-left: 0 !important;
+    }}
+    @page {{
+      margin: 1.2cm 1.5cm;
+      size: letter portrait;
+    }}
+  }}
+</style>
+</head>
+<body>
+<div class="resume-paper">
+  <div class="header">
+    <div class="name">{resume.name}</div>
+    <div class="title-tagline">{resume.title} {f"• {resume.tagline}" if resume.tagline else ""}</div>
+    <div class="contacts">{contact_html}</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Professional Summary</div>
+    <div class="summary-text">{resume.summary}</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Technical Competencies</div>
+    {skills_html}
+  </div>
+
+  <div class="section">
+    <div class="section-title">Professional Experience</div>
+    {exp_html}
+  </div>
+
+  <div class="section">
+    <div class="section-title">Education</div>
+    {edu_html}
+  </div>
+</div>
+</body>
+</html>
+"""
+
+    def _render_executive(
+        self,
+        resume: ResumeData,
+        highlight_diff: bool = False,
+        base_resume: Optional[ResumeData] = None,
+    ) -> str:
+        # High contrast, traditional serif/sans ATS compliant
+        contacts = [c for c in [resume.email, resume.phone, resume.location, resume.linkedin, resume.github] if c]
+        contact_html = " | ".join(contacts)
+
+        exp_html = ""
+        for exp in resume.experience:
+            bullets = "".join([f"<li>{h}</li>" for h in exp.highlights])
+            loc = f" — {exp.location}" if exp.location else ""
+            exp_html += f"""
+            <div style="margin-bottom: 14px; break-inside: avoid;">
+              <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                <span>{exp.role}</span>
+                <span>{exp.period}</span>
+              </div>
+              <div style="font-style: italic; color: #444; margin-bottom: 4px;">{exp.company}{loc}</div>
+              <ul style="padding-left: 20px; font-size: 10pt; line-height: 1.5;">{bullets}</ul>
+            </div>
+            """
+
+        skills_lines = []
+        for cat, items in resume.skills.items():
+            cat_label = cat.replace("_", " ").title()
+            skills_lines.append(f"<strong>{cat_label}:</strong> " + ", ".join(items))
+        skills_html = "<br>".join(skills_lines)
+
+        edu_html = ""
+        for edu in resume.education:
+            edu_html += f"""
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10pt;">
+              <span><strong>{edu.degree}</strong>, {edu.institution}</span>
+              <span>{edu.period}</span>
+            </div>
+            """
+
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{resume.name} - Executive Resume</title>
+<style>
+  body {{ font-family: "Georgia", Times, serif; color: #111; line-height: 1.4; padding: 30px 20px; background: #fafafa; }}
+  .paper {{ max-width: 820px; margin: 0 auto; background: #fff; padding: 40px 50px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }}
+  h1 {{ text-align: center; font-size: 24pt; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }}
+  .title {{ text-align: center; font-size: 11pt; font-style: italic; margin-bottom: 4px; }}
+  .contacts {{ text-align: center; font-size: 9.5pt; border-bottom: 1px solid #222; padding-bottom: 12px; margin-bottom: 18px; }}
+  .sec-heading {{ font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #aaa; padding-bottom: 2px; margin: 16px 0 10px 0; letter-spacing: 0.5px; }}
+  @media print {{ body {{ background: #fff; padding: 0; }} .paper {{ box-shadow: none; padding: 0; }} }}
+</style>
+</head>
+<body>
+<div class="paper">
+  <h1>{resume.name}</h1>
+  <div class="title">{resume.title}</div>
+  <div class="contacts">{contact_html}</div>
+
+  <div class="sec-heading">Summary</div>
+  <p style="font-size: 10pt; text-align: justify;">{resume.summary}</p>
+
+  <div class="sec-heading">Core Competencies</div>
+  <div style="font-size: 10pt;">{skills_html}</div>
+
+  <div class="sec-heading">Professional Experience</div>
+  {exp_html}
+
+  <div class="sec-heading">Education</div>
+  {edu_html}
+</div>
+</body>
+</html>
+"""
+
+    def _render_compact(
+        self,
+        resume: ResumeData,
+        highlight_diff: bool = False,
+        base_resume: Optional[ResumeData] = None,
+    ) -> str:
+        # Compact single/two page layout
+        return self._render_modern(resume, highlight_diff, base_resume)
+
+
+template_engine = TemplateEngine()

@@ -1,0 +1,69 @@
+{
+  "name": "Alex Mercer",
+  "title": "Staff Full Stack & Cloud Architect",
+  "tagline": "Distributed Systems • High-Scale Web Platforms • Cloud-Native Architecture",
+  "location": "San Francisco, CA",
+  "email": "alex.mercer.eng@example.com",
+  "phone": "+1 (555) 019-2834",
+  "linkedin": "https://linkedin.com/in/alex-mercer-example",
+  "github": "https://github.com/alex-mercer-example",
+  "summary": "Seasoned Staff Software Engineer with 8+ years designing and operating mission-critical distributed web applications. Deep expertise in modern frontend architecture, microfrontends, Python/Node backends, and cloud infrastructure. Passionate about AI-augmented engineering workflows, performance optimization, and mentoring high-velocity engineering teams.",
+  "availability": {
+    "status": "Available for Leadership Roles",
+    "target": "Staff / Lead Software Engineer",
+    "note": "Open to remote and hybrid opportunities"
+  },
+  "experience": [
+    {
+      "role": "Staff Software Engineer",
+      "company": "CloudScale Platforms Inc.",
+      "period": "2022 – Present",
+      "location": "San Francisco, CA",
+      "highlights": [
+        "Architected and deployed a multi-tenant microfrontend platform serving 4M+ daily active users, improving core Web Vitals (LCP) by 42%",
+        "Led cross-functional migration from legacy monolith to decoupled event-driven services using Python and Kafka, cutting infrastructure costs by $180k/yr",
+        "Engineered automated CI/CD deployment pipelines with end-to-end regression testing, boosting team release frequency from bi-weekly to multiple daily deployments",
+        "Mentored 12+ senior and mid-level engineers in distributed system design, testing strategies, and incident management"
+      ]
+    },
+    {
+      "role": "Senior Frontend Specialist",
+      "company": "Nexus Systems",
+      "period": "2019 – 2022",
+      "location": "Austin, TX",
+      "highlights": [
+        "Built enterprise design system adopted by 14 product squads, standardizing WCAG 2.1 AA accessibility and reducing UI development cycle time by 35%",
+        "Spearheaded adoption of reactive state management and signals architecture, eliminating complex state race conditions",
+        "Implemented real-time data streaming dashboards using WebSockets and Server-Sent Events handling 50k concurrent metrics streams"
+      ]
+    },
+    {
+      "role": "Full Stack Developer",
+      "company": "Vanguard Digital Lab",
+      "period": "2016 – 2019",
+      "location": "New York, NY",
+      "highlights": [
+        "Developed and maintained high-throughput RESTful and GraphQL APIs in Python and TypeScript",
+        "Created customer-facing web applications with 99.98% uptime SLA using containerized Docker deployments on Kubernetes"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Master of Science in Computer Science",
+      "institution": "University of Washington",
+      "period": "2014 – 2016"
+    },
+    {
+      "degree": "Bachelor of Science in Computer Engineering",
+      "institution": "Georgia Institute of Technology",
+      "period": "2010 – 2014"
+    }
+  ],
+  "skills": {
+    "frontendArchitecture": ["Angular", "TypeScript", "Signals", "Design Systems", "Microfrontends", "RxJS", "React", "Next.js"],
+    "backendSystems": ["Python", "FastAPI", "Node.js", "REST APIs", "GraphQL", "Kafka", "PostgreSQL", "Redis"],
+    "cloudDevOps": ["Docker", "Kubernetes", "AWS", "CI/CD Pipelines", "Terraform", "Git"],
+    "aiWorkflows": ["LangChain", "Streaming UIs", "RAG Pipelines", "Prompt Engineering", "OpenAI API", "Ollama"]
+  }
+}

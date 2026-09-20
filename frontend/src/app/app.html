@@ -1,0 +1,46 @@
+<div class="app-container">
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="logo-badge">AI</div>
+      <div class="brand-text">
+        <h1 class="brand-title">Resume Architect</h1>
+        <span class="brand-subtitle">ATS-Targeted AI Resume Engine & Alignment Streamer</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- Ground Truth Candidate Badge / Button -->
+      <button type="button" class="btn-header btn-ground-truth" (click)="openBaseResumeModal()" title="Inspect or edit base candidate resume (Ground Truth)">
+        <span class="gt-icon">🛡️</span>
+        <span class="gt-label">Source of Truth:</span>
+        <span class="gt-name">{{ activeResume()?.name || 'Loading...' }}</span>
+        <span class="gt-edit">Edit</span>
+      </button>
+
+      <!-- LLM Provider Badge / Button -->
+      <button type="button" class="btn-header btn-provider" (click)="openSettingsDrawer()" title="Configure LLM Provider (Ollama, OpenAI, Hugging Face)">
+        <span class="provider-icon">⚙️</span>
+        <span class="provider-label">{{ llmConfig().provider | uppercase }}</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Split-Screen Workspace -->
+  <main class="main-workspace">
+    <!-- Left Pane: Inputs & Real-Time Decision Stream -->
+    <div class="workspace-pane left-pane">
+      <app-job-input></app-job-input>
+      <app-stream-console></app-stream-console>
+    </div>
+
+    <!-- Right Pane: Live Resume Preview & Export Controls -->
+    <div class="workspace-pane right-pane">
+      <app-resume-preview></app-resume-preview>
+    </div>
+  </main>
+
+  <!-- Modals & Drawers -->
+  <app-base-resume-modal></app-base-resume-modal>
+  <app-settings-drawer></app-settings-drawer>
+</div>

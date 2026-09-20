@@ -216,3 +216,25 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Personal Resume Data & Secrets (Strictly Excluded for Open-Source Safety)
+*.personal.json
+backend/data/my_resume.json
+backend/data/default_base_resume.json
+backend/data/personal_*.json
+.env
+.env.*
+!.env.example
+
+# Node / Angular Build & Cache
+node_modules/
+frontend/dist/
+frontend/.angular/
+.angular/
+dist/
+.DS_Store
+
+# Local Python Environments
+venv/
+backend/venv/
+.venv/

@@ -1,0 +1,17 @@
+services:
+  resume-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: resume-generator-app
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - RESUME_DATA_PATH=/app/backend/data/my_resume.json
+    volumes:
+      # Mount user's personal resume so edits persist across container runs
+      - ./backend/data/my_resume.json:/app/backend/data/my_resume.json:rw
+    restart: unless-stopped
