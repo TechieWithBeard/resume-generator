@@ -132,10 +132,22 @@ class TestResumeGenerator(unittest.TestCase):
         self.assertEqual(linkedin_extractor.extract_job_id(url2), "3981726354")
 
     def test_cv_executive_template_rendering(self):
-        """Verifies cv_executive template renders projects, certs, publications, and page break rules."""
+        """Verifies cv_executive template renders projects, certs, publications, role scope, target banner, and page break rules."""
         from backend.app.models.resume import ProjectItem, CertificationItem
         cv_resume = self.sample_base.model_copy(deep=True)
         cv_resume.document_type = "cv"
+        cv_resume.target_role = "Senior Frontend Developer"
+        cv_resume.target_company = "Rentman"
+        cv_resume.experience[0].scope = "Lead Frontend Architect directing architecture across European teams."
+        cv_resume.experience[0].technologies = ["Angular 20", "Nx", "TypeScript", "Signals"]
+        cv_resume.experience.append(
+            ExperienceItem(
+                role="Senior Frontend Engineer",
+                company="Maistering B.V.",
+                period="2019 – 2022",
+                highlights=["Delivered enterprise platforms for Netherlands client."],
+            )
+        )
         cv_resume.projects = [
             ProjectItem(
                 name="Enterprise Monorepo Modernization",
@@ -158,11 +170,21 @@ class TestResumeGenerator(unittest.TestCase):
 
         html = template_engine.render(cv_resume, template_id="cv_executive")
         self.assertIn("Curriculum Vitae", html)
+        self.assertIn("Senior Frontend Developer", html)
+        self.assertIn("Rentman", html)
+        self.assertIn("TARGET ROLE ALIGNMENT", html)
+        self.assertIn("SCOPE &amp; LEADERSHIP" if "&amp;" in html else "SCOPE & LEADERSHIP", html)
+        self.assertIn("Lead Frontend Architect directing architecture across European teams", html)
+        self.assertIn("Environment:", html)
+        self.assertIn("competency-card", html)
         self.assertIn("Enterprise Monorepo Modernization", html)
         self.assertIn("Lead Architect", html)
+        self.assertIn("Architecture Stack:", html)
         self.assertIn("AWS Certified Solutions Architect", html)
         self.assertIn("AWS-12345", html)
         self.assertIn("High-Scale UI Architecture in Modern Enterprise Web", html)
+        self.assertIn("European Enterprise", html)
+        self.assertIn("Netherlands", html)
         self.assertIn("avoid-break", html)
         self.assertIn("@media print", html)
 
@@ -203,10 +225,14 @@ class TestResumeGenerator(unittest.TestCase):
         gen_html = complete_event["html"]
 
         self.assertEqual(gen_data["document_type"], "cv")
+        self.assertEqual(gen_data.get("target_role"), "Principal Frontend Architect")
         self.assertTrue(len(gen_data["projects"]) > 0)
         self.assertTrue(len(gen_data["certifications"]) > 0)
+        self.assertTrue(any(exp.get("scope") for exp in gen_data["experience"]))
+        self.assertTrue(any(len(exp.get("technologies", [])) > 0 for exp in gen_data["experience"]))
         self.assertIn("Curriculum Vitae", gen_html)
         self.assertIn("Mission-Critical Monorepo", gen_html)
+        self.assertIn("Principal Frontend Architect", gen_html)
 
 
 if __name__ == "__main__":

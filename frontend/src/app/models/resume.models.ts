@@ -10,6 +10,8 @@ export interface ExperienceItem {
   period: string;
   location?: string;
   highlights: string[];
+  scope?: string;
+  technologies?: string[];
 }
 
 export interface EducationItem {
@@ -54,6 +56,8 @@ export interface ResumeData {
   certifications?: CertificationItem[];
   publications?: string[];
   document_type?: 'resume' | 'cv';
+  target_role?: string;
+  target_company?: string;
   raw_text?: string;
   additional_sections?: Record<string, any>;
 }

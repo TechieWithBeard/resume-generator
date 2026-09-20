@@ -19,6 +19,8 @@ class ExperienceItem(BaseModel):
     period: str
     location: Optional[str] = None
     highlights: List[str] = Field(default_factory=list)
+    scope: Optional[str] = None
+    technologies: List[str] = Field(default_factory=list)
 
 
 class EducationItem(BaseModel):
@@ -63,6 +65,8 @@ class ResumeData(BaseModel):
     certifications: List[CertificationItem] = Field(default_factory=list)
     publications: List[str] = Field(default_factory=list)
     document_type: Literal["resume", "cv"] = "resume"
+    target_role: Optional[str] = None
+    target_company: Optional[str] = None
     raw_text: Optional[str] = ""
     additional_sections: Dict[str, Any] = Field(default_factory=dict)
 
