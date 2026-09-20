@@ -83,6 +83,15 @@ npm run build
 
 ---
 
+### Option D: VS Code One-Click Run & Debug
+
+This repository includes a full `.vscode` suite configured out of the box:
+- **Run Full Stack**: Press `Ctrl+Shift+B` (or `Cmd+Shift+B` on Mac) to run the default build task `🚀 Run Full Stack (start.sh)`.
+- **Debug in VS Code**: Press `F5` to start the compound launch configuration `✨ Full Stack (Backend + Open Browser)`, which starts the Python ASGI backend with the debugpy debugger and opens the browser.
+- **Run Tasks**: Open Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) -> `Tasks: Run Task` to selectively start the backend, start the Angular dev server, build the production bundle, or run the test suite.
+
+---
+
 ## ⚙️ Configurable LLM Providers
 
 The generator supports multi-provider LLMs configurable via `.env` or dynamically in the in-app **LLM Settings Drawer**:

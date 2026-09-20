@@ -70,6 +70,11 @@ graph TB
 
 ```
 resume-generator/
+├── .vscode/
+│   ├── launch.json                # VS Code launch & compound debug configurations
+│   ├── tasks.json                 # VS Code tasks (run full stack, build, test, docker)
+│   ├── settings.json              # Python, Tailwind CSS, and editor configurations
+│   └── extensions.json            # Recommended extensions (Python, Angular, Tailwind)
 ├── docs/
 │   ├── ADR.md                     # Architecture Decision Records
 │   ├── ARCHITECTURE.md            # System Architecture Specification (this document)
@@ -78,7 +83,6 @@ resume-generator/
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── main.py                # ASGI application entrypoint & routing
-│   │   ├── config.py              # Environment configuration & provider settings
 │   │   ├── models/
 │   │   │   ├── __init__.py
 │   │   │   └── resume.py          # Pydantic schemas: Resume, JobInput, StreamEvents
@@ -93,7 +97,8 @@ resume-generator/
 │   │   └── default_base_resume.json  # Initialized base resume for local user
 │   ├── tests/
 │   │   ├── __init__.py
-│   │   └── test_backend.py           # Unit & integration tests
+│   │   ├── test_backend.py           # Unit tests (models, templates, anti-hallucination)
+│   │   └── test_e2e.py               # E2E integration tests (ASGI routes & SSE streams)
 │   ├── requirements.txt
 │   └── run.py
 ├── frontend/
@@ -103,18 +108,23 @@ resume-generator/
 │   │   │   │   └── resume.models.ts  # TypeScript schemas
 │   │   │   ├── services/
 │   │   │   │   └── resume-generator.service.ts # Signals state store & SSE reader
-│   │   │   ├── components/
+│   │   │   ├── shared/components/    # Reusable UI primitives
+│   │   │   │   ├── badge/            # BadgeComponent (.ts, .html, .scss)
+│   │   │   │   ├── card/             # CardComponent (.ts, .html, .scss)
+│   │   │   │   └── modal/            # ModalComponent (.ts, .html, .scss)
+│   │   │   ├── components/           # Feature components (.ts, .html, .scss)
+│   │   │   │   ├── header/
 │   │   │   │   ├── job-input/
 │   │   │   │   ├── stream-console/
 │   │   │   │   ├── resume-preview/
 │   │   │   │   ├── base-resume-modal/
 │   │   │   │   └── settings-drawer/
-│   │   │   ├── app.component.ts
-│   │   │   ├── app.component.html
-│   │   │   └── app.component.css
+│   │   │   ├── app.ts, app.html, app.scss
 │   │   ├── index.html
 │   │   ├── main.ts
-│   │   └── styles.css
+│   │   └── styles.scss               # Tailwind CSS directives & global styling
+│   ├── tailwind.config.js
+│   ├── postcss.config.js
 │   ├── package.json
 │   └── angular.json
 ├── Dockerfile                     # Multi-stage container build

@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🚀 Backend: Python ASGI Server (Debug)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/run.py",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "PORT": "8000",
+        "HOST": "0.0.0.0"
+      },
+      "justMyCode": true
+    },
+    {
+      "name": "🧪 Backend: Run All Unit Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "unittest",
+      "args": ["discover", "-s", "backend/tests", "-p", "test_*.py"],
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "🌐 Browser: Open Local App (http://localhost:8000)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8000",
+      "webRoot": "${workspaceFolder}/frontend/src"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "✨ Full Stack (Backend + Open Browser)",
+      "configurations": [
+        "🚀 Backend: Python ASGI Server (Debug)",
+        "🌐 Browser: Open Local App (http://localhost:8000)"
+      ]
+    }
+  ]
+}
