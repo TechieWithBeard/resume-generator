@@ -416,7 +416,12 @@ export class ResumeGeneratorService {
     if (type === 'step') {
       this.currentStep.set(data.step as GeneratorStep);
     } else if (type === 'thought_stream' || type === 'token') {
-      this.activeStreamingText.update((text) => text + (data.content || ''));
+      const chunk = data.content || '';
+      // Ignore bare dot characters from any legacy stream tasks
+      if (chunk.trim() === '.' && (this.activeStreamingText().endsWith('.') || !this.activeStreamingText().trim())) {
+        return;
+      }
+      this.activeStreamingText.update((text) => text + chunk);
     } else if (type === 'thought') {
       // If there was active streaming text accumulated, commit it to logs
       const currentStream = this.activeStreamingText().trim();

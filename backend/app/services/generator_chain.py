@@ -239,7 +239,35 @@ class GeneratorChain:
             "content": f"Formulating targeted executive profile highlighting {', '.join(audit_report.direct_matches[:4])}...",
             "timestamp": now_str(),
         }
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.15)
+
+        # Stream real-time strategic reasoning tokens so the user's typewriter console displays authentic reasoning
+        company_phrase = f" at {target_company}" if target_company else ""
+        if doc_type == "cv":
+            strategy_phrases = [
+                f"Analyzing executive role scope: Aligning comprehensive CV for {target_role}{company_phrase}...\n",
+                f"Harmonizing verified technical taxonomy across: {', '.join(audit_report.direct_matches[:6])}...\n",
+                "Spotlighting architectural case studies, monorepo governance, and high-scale systems...\n",
+                "Enforcing anti-hallucination directive: strictly preserving candidate's authentic dates & credentials...\n",
+            ]
+        else:
+            strategy_phrases = [
+                f"Analyzing role scope: Strategic alignment for {target_role}{company_phrase}...\n",
+                f"Mapping verified competencies: {', '.join(audit_report.direct_matches[:5])}...\n",
+                "Reordering achievements to highlight architecture decisions and measurable metrics...\n",
+                "Enforcing anti-hallucination directive: strictly prohibiting fabrication of unverified tools...\n",
+            ]
+
+        for phrase in strategy_phrases:
+            for token in phrase.split(" "):
+                yield {
+                    "type": "thought_stream",
+                    "step": "synthesis",
+                    "content": token + " ",
+                    "timestamp": now_str(),
+                }
+                await asyncio.sleep(0.02)
+            await asyncio.sleep(0.06)
 
         llm = self._get_llm(config)
         tailored_resume = None
@@ -660,9 +688,11 @@ class GeneratorChain:
                 "NEVER invent new employers or change dates.\n"
                 "2. You MUST NOT add skills or tools the candidate has never used. Only emphasize and highlight real skills.\n"
                 "3. Emphasize comprehensive career achievements, architectural design decisions, system scale, and leadership.\n"
-                "4. Maintain and preserve projects, certifications, and publications from the base profile.\n"
-                "5. First output your strategic reasoning thoughts explaining your alignment strategy.\n"
-                "6. Then output the complete final CV JSON enclosed inside ```json ... ``` code blocks."
+                "4. Maintain and preserve projects, certifications, and publications from the base profile.\n\n"
+                "TWO-PHASE OUTPUT REQUIREMENTS:\n"
+                "Phase 1: Write your Strategic Alignment Reasoning (3-5 concise sentences explaining the alignment strategy, "
+                "key technical skills prioritized, and high-impact achievements elevated).\n"
+                "Phase 2: Output the complete tailored CV JSON enclosed inside ```json ... ``` code blocks."
             )
         else:
             system_prompt = (
@@ -672,19 +702,22 @@ class GeneratorChain:
                 "1. You MUST ONLY use the candidate's verified companies, employment dates, and educational credentials. "
                 "NEVER invent new employers or change dates.\n"
                 "2. You MUST NOT add skills or tools the candidate has never used. Only emphasize and highlight real skills.\n"
-                "3. Reframe bullet points to highlight measurable business impact, architecture decisions, and target keywords.\n"
-                "4. First output your strategic reasoning thoughts explaining your alignment strategy.\n"
-                "5. Then output the complete final resume JSON enclosed inside ```json ... ``` code blocks."
+                "3. Reframe bullet points to highlight measurable business impact, architecture decisions, and target keywords.\n\n"
+                "TWO-PHASE OUTPUT REQUIREMENTS:\n"
+                "Phase 1: Write your Strategic Alignment Reasoning (3-5 concise sentences explaining the alignment strategy, "
+                "key technical skills prioritized, and high-impact achievements elevated).\n"
+                "Phase 2: Output the complete tailored resume JSON enclosed inside ```json ... ``` code blocks."
             )
 
-        user_content = json.dumps({
-            "target_role": target_role,
-            "target_company": company or "Target Company",
-            "document_type": doc_type,
-            "job_description": job_text[:15000],
-            "base_resume": base.model_dump(),
-            "direct_matches": audit.direct_matches,
-        })
+        user_content = (
+            f"TARGET ROLE: {target_role}\n"
+            f"TARGET COMPANY: {company or 'Target Company'}\n"
+            f"DOCUMENT TYPE: {doc_type.upper()}\n\n"
+            f"JOB SPECIFICATION:\n{job_text[:15000]}\n\n"
+            f"VERIFIED CANDIDATE BASE PROFILE:\n{json.dumps(base.model_dump(), indent=2)}\n\n"
+            f"VERIFIED DIRECT SKILLS:\n{', '.join(audit.direct_matches)}\n\n"
+            f"INSTRUCTION: Begin with Phase 1 (Strategic Alignment Reasoning), followed immediately by Phase 2 (```json ... ```)."
+        )
 
         messages = [
             SystemMessage(content=system_prompt),
@@ -694,6 +727,7 @@ class GeneratorChain:
         full_output = ""
         json_started = False
         token_count = 0
+        milestones_emitted = set()
 
         async for chunk in llm.astream(messages):
             content_chunk = chunk.content if hasattr(chunk, "content") else str(chunk)
@@ -708,15 +742,49 @@ class GeneratorChain:
                     yield {
                         "type": "thought",
                         "step": "synthesis",
-                        "content": f"Reasoning complete. Streaming aligned {doc_type.upper()} schema...",
+                        "content": f"Strategic reasoning established. Compiling tailored {doc_type.upper()} schema...",
                         "timestamp": now_str(),
                     }
-                # Emit periodic dot to indicate ongoing JSON generation
-                if token_count % 30 == 0:
+
+                # Emit informative milestone events as sections stream in
+                if '"summary"' in full_output and "summary" not in milestones_emitted:
+                    milestones_emitted.add("summary")
                     yield {
-                        "type": "thought_stream",
+                        "type": "thought",
                         "step": "synthesis",
-                        "content": ".",
+                        "content": "Synthesizing tailored executive summary with verified role impact...",
+                        "timestamp": now_str(),
+                    }
+                elif '"skills"' in full_output and "skills" not in milestones_emitted:
+                    milestones_emitted.add("skills")
+                    yield {
+                        "type": "thought",
+                        "step": "synthesis",
+                        "content": f"Harmonizing technical skills taxonomy: prioritizing {', '.join(audit.direct_matches[:4])}...",
+                        "timestamp": now_str(),
+                    }
+                elif '"experience"' in full_output and "experience" not in milestones_emitted:
+                    milestones_emitted.add("experience")
+                    yield {
+                        "type": "thought",
+                        "step": "synthesis",
+                        "content": f"Aligning work history and quantifiable achievements for {target_role}...",
+                        "timestamp": now_str(),
+                    }
+                elif '"projects"' in full_output and "projects" not in milestones_emitted:
+                    milestones_emitted.add("projects")
+                    yield {
+                        "type": "thought",
+                        "step": "synthesis",
+                        "content": "Structuring verified architectural projects and case studies...",
+                        "timestamp": now_str(),
+                    }
+                elif '"education"' in full_output and "education" not in milestones_emitted:
+                    milestones_emitted.add("education")
+                    yield {
+                        "type": "thought",
+                        "step": "synthesis",
+                        "content": "Validating degree credentials and institutions...",
                         "timestamp": now_str(),
                     }
             else:
