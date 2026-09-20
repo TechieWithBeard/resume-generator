@@ -1,0 +1,44 @@
+<header class="app-header bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <!-- Brand -->
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 to-sky-400 text-white flex items-center justify-center font-black text-sm shadow-md shadow-sky-500/20">
+        AI
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-base font-bold text-slate-900 tracking-tight m-0">Resume Architect</h1>
+          <app-badge variant="primary" size="sm">ATS Engine</app-badge>
+        </div>
+        <span class="text-xs text-slate-500 hidden sm:block">AI-Targeted Resume Alignment & Real-Time Streamer</span>
+      </div>
+    </div>
+
+    <!-- Header Actions -->
+    <div class="flex items-center gap-3">
+      <!-- Ground Truth Button -->
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 text-xs font-semibold transition-all duration-150 shadow-sm"
+        (click)="openBaseResumeModal()"
+        title="View or modify verified Ground Truth base resume"
+      >
+        <span class="text-emerald-600">🛡️</span>
+        <span class="hidden md:inline text-emerald-700 font-normal">Source of Truth:</span>
+        <span class="font-bold text-emerald-900">{{ activeResume()?.name || 'Loading...' }}</span>
+        <span class="px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900 text-[10px] font-bold">Edit</span>
+      </button>
+
+      <!-- LLM Provider Settings Button -->
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-all duration-150 shadow-sm"
+        (click)="openSettingsDrawer()"
+        title="Configure AI model provider"
+      >
+        <span class="text-slate-500">⚙️</span>
+        <span class="font-mono uppercase text-sky-700">{{ llmConfig().provider }}</span>
+      </button>
+    </div>
+  </div>
+</header>

@@ -1,0 +1,138 @@
+<app-modal
+  [isOpen]="isOpen()"
+  title="Candidate Ground Truth (Base Resume)"
+  maxWidth="max-w-3xl"
+  (close)="close()"
+>
+  <span modal-header-icon class="text-xl">🛡️</span>
+
+  <!-- Modal Body Content -->
+  <div class="space-y-4">
+    <!-- Informational Alert -->
+    <div class="p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-lg text-xs text-emerald-800 leading-relaxed">
+      <strong>Ground Truth Invariant:</strong> The AI generation chain uses this profile as the immutable source of truth. The AI will never invent employers, degree credentials, or unverified skills outside this baseline. You can edit your profile or paste your raw JSON.
+    </div>
+
+    <!-- Toggle View Mode -->
+    <div class="inline-flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+      <button
+        type="button"
+        class="px-3 py-1 text-xs font-semibold rounded-md transition-all duration-150"
+        [ngClass]="editMode() === 'form' ? 'bg-white text-sky-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
+        (click)="editMode.set('form')"
+      >
+        Structured Form
+      </button>
+      <button
+        type="button"
+        class="px-3 py-1 text-xs font-semibold rounded-md transition-all duration-150"
+        [ngClass]="editMode() === 'json' ? 'bg-white text-sky-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
+        (click)="onSwitchToJson()"
+      >
+        Raw JSON Schema
+      </button>
+    </div>
+
+    <!-- Form Mode -->
+    @if (editMode() === 'form') {
+      <div class="space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+            <input type="text" class="w-full px-3 py-1.5 text-xs text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none" [(ngModel)]="formData.name" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Professional Title</label>
+            <input type="text" class="w-full px-3 py-1.5 text-xs text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none" [(ngModel)]="formData.title" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+            <input type="email" class="w-full px-3 py-1.5 text-xs text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none" [(ngModel)]="formData.email" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Phone</label>
+            <input type="text" class="w-full px-3 py-1.5 text-xs text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none" [(ngModel)]="formData.phone" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">LinkedIn URL</label>
+            <input type="text" class="w-full px-3 py-1.5 text-xs text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none" [(ngModel)]="formData.linkedin" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">GitHub URL</label>
+            <input type="text" class="w-full px-3 py-1.5 text-xs text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none" [(ngModel)]="formData.github" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Executive Summary</label>
+          <textarea rows="3" class="w-full p-2.5 text-xs text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none leading-relaxed" [(ngModel)]="formData.summary"></textarea>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-slate-800 border-b border-slate-200 pb-1 mb-2">
+            Verified Experience ({{ formData.experience.length }} roles)
+          </div>
+          <div class="space-y-2 max-h-52 overflow-y-auto pr-1">
+            @for (exp of formData.experience; track exp.company + exp.period) {
+              <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                <div class="font-bold text-slate-900 mb-1">
+                  {{ exp.role }} <span class="text-slate-400 font-normal">at</span> <span class="text-sky-700">{{ exp.company }}</span> <span class="text-slate-500 font-normal">({{ exp.period }})</span>
+                </div>
+                <ul class="list-disc list-inside space-y-0.5 text-slate-600 text-[11px]">
+                  @for (h of exp.highlights; track h) {
+                    <li>{{ h }}</li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    } @else {
+      <div class="space-y-2">
+        <textarea
+          rows="16"
+          class="w-full p-3 font-mono text-xs text-slate-900 bg-slate-50 border border-slate-300 rounded-lg leading-relaxed focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
+          [(ngModel)]="rawJson"
+        ></textarea>
+        @if (jsonError()) {
+          <div class="text-xs text-red-600 font-semibold">{{ jsonError() }}</div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Modal Footer Slot -->
+  <div modal-footer class="flex items-center justify-between w-full">
+    <button
+      type="button"
+      class="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-600 text-xs font-semibold transition-colors"
+      (click)="onReset()"
+    >
+      ↺ Reset to Default
+    </button>
+
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        class="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors"
+        (click)="close()"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition-colors shadow-sm"
+        (click)="onSave()"
+      >
+        Save Ground Truth
+      </button>
+    </div>
+  </div>
+</app-modal>

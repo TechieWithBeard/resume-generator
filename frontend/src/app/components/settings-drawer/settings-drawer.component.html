@@ -1,0 +1,116 @@
+@if (isOpen()) {
+  <div class="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-sm animate-fade-in" (click)="close()">
+    <div
+      class="w-full max-w-md bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 animate-slide-in"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Drawer Header -->
+      <div class="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">⚙️</span>
+          <h3 class="text-sm font-bold text-slate-900 m-0">AI Engine & Model Settings</h3>
+        </div>
+        <button
+          type="button"
+          class="text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 p-1.5 rounded-lg transition-colors"
+          (click)="close()"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Drawer Body -->
+      <div class="p-6 overflow-y-auto flex-1 space-y-5 text-slate-700">
+        <!-- Provider Selection -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-800">Execution Provider</label>
+          <select
+            class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none bg-white font-medium"
+            [(ngModel)]="config.provider"
+          >
+            <option value="auto">⚡ Auto (Ollama -> OpenAI -> Heuristic)</option>
+            <option value="ollama">🦙 Local Ollama (Privacy First, Offline)</option>
+            <option value="openai">✨ OpenAI (GPT-4o / GPT-4o-mini)</option>
+            <option value="huggingface">🤗 Hugging Face Inference</option>
+            <option value="heuristic">🎯 High-Precision Deterministic Engine (Zero Keys)</option>
+          </select>
+          <p class="text-[11px] text-slate-400">
+            Switch between local offline privacy and high-speed cloud intelligence on demand.
+          </p>
+        </div>
+
+        <!-- Ollama Options -->
+        @if (config.provider === 'ollama' || config.provider === 'auto') {
+          <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+            <span class="text-xs font-bold text-slate-800 block">Local Ollama Configuration</span>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Ollama Host URL</label>
+              <input
+                type="text"
+                class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:border-sky-500 font-mono"
+                placeholder="http://localhost:11434"
+                [(ngModel)]="config.base_url"
+              />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Ollama Model</label>
+              <input
+                type="text"
+                class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:border-sky-500 font-mono"
+                placeholder="llama3 / mistral / qwen2.5"
+                [(ngModel)]="config.model_name"
+              />
+            </div>
+          </div>
+        }
+
+        <!-- OpenAI Options -->
+        @if (config.provider === 'openai' || config.provider === 'auto') {
+          <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+            <span class="text-xs font-bold text-slate-800 block">OpenAI Cloud Configuration</span>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">OpenAI API Key</label>
+              <input
+                type="password"
+                class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:border-sky-500 font-mono"
+                placeholder="sk-..."
+                [(ngModel)]="config.api_key"
+              />
+              <p class="text-[11px] text-slate-400 mt-1">Leave empty to use the server OPENAI_API_KEY environment variable.</p>
+            </div>
+          </div>
+        }
+
+        <!-- Temperature Slider -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center">
+            <label class="text-xs font-bold text-slate-800">Generation Temperature</label>
+            <span class="font-mono text-xs text-sky-700 font-bold">{{ config.temperature }}</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="0.8"
+            step="0.05"
+            class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-600"
+            [(ngModel)]="config.temperature"
+          />
+          <p class="text-[11px] text-slate-400">
+            Lower temperature guarantees maximum fidelity and strict adherence to base resume facts.
+          </p>
+        </div>
+      </div>
+
+      <!-- Drawer Footer -->
+      <div class="p-4 bg-slate-50 border-t border-slate-200">
+        <button
+          type="button"
+          class="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition-colors shadow-sm"
+          (click)="save()"
+        >
+          Save Configuration
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,19 @@
+<div
+  class="app-card rounded-xl overflow-hidden transition-all duration-200"
+  [ngClass]="{
+    'border border-slate-200 bg-white text-slate-800': !dark,
+    'border border-slate-800 bg-slate-900 text-slate-100': dark,
+    'shadow-sm hover:shadow-md': shadow && !dark,
+    'shadow-lg': shadow && dark
+  }"
+>
+  <div class="card-header-slot">
+    <ng-content select="[card-header]"></ng-content>
+  </div>
+  <div class="card-body-slot">
+    <ng-content></ng-content>
+  </div>
+  <div class="card-footer-slot">
+    <ng-content select="[card-footer]"></ng-content>
+  </div>
+</div>

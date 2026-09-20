@@ -1,0 +1,12 @@
+<span
+  class="badge inline-flex items-center gap-1.5 font-medium rounded-full transition-colors"
+  [ngClass]="[
+    'badge-' + variant,
+    'badge-' + size
+  ]"
+>
+  @if (dot) {
+    <span class="badge-dot w-1.5 h-1.5 rounded-full"></span>
+  }
+  <ng-content></ng-content>
+</span>

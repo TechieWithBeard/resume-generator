@@ -1,0 +1,84 @@
+<app-card [shadow]="true" class="h-full flex flex-col">
+  <!-- Toolbar in card-header -->
+  <div card-header class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+    <!-- Left: Template Switcher -->
+    <div class="flex items-center gap-3">
+      <span class="text-xs font-bold text-slate-800">Template:</span>
+      <div class="inline-flex bg-slate-200/80 p-1 rounded-lg">
+        @for (tmpl of templates(); track tmpl.id) {
+          <button
+            type="button"
+            class="px-2.5 py-1 text-xs font-semibold rounded-md transition-all duration-150"
+            [ngClass]="selectedTemplate() === tmpl.id ? 'bg-white text-sky-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
+            (click)="onSelectTemplate(tmpl.id)"
+            [title]="tmpl.description"
+          >
+            {{ tmpl.name }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <!-- Right: Actions -->
+    <div class="flex items-center gap-2">
+      <!-- Diff Highlight Toggle -->
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 shadow-sm"
+        [ngClass]="comparisonMode() ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+        (click)="onToggleDiff()"
+        title="Highlight tailored modifications and emphasized achievements"
+      >
+        <span>🔍</span>
+        <span>{{ comparisonMode() ? 'Diff View Active' : 'Highlight Changes' }}</span>
+      </button>
+
+      <!-- Download PDF -->
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition-all duration-150 shadow-sm shadow-sky-600/20"
+        (click)="onDownloadPdf()"
+        title="Export as vector PDF via browser print"
+      >
+        <span>🖨️</span> PDF
+      </button>
+
+      <!-- Download HTML -->
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold transition-all duration-150 shadow-sm"
+        (click)="onDownloadHtml()"
+        title="Download standalone ATS HTML file"
+      >
+        <span>🌐</span> HTML
+      </button>
+
+      <!-- Download JSON -->
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold transition-all duration-150 shadow-sm"
+        (click)="onDownloadJson()"
+        title="Download raw resume JSON"
+      >
+        <span>&#123; &#125;</span> JSON
+      </button>
+    </div>
+  </div>
+
+  <!-- Preview Frame -->
+  <div class="p-4 bg-slate-200/80 flex-1 flex justify-center items-start min-h-[720px] overflow-auto">
+    @if (renderedHtml()) {
+      <iframe
+        #resumeIframe
+        class="w-full h-full min-h-[820px] bg-white rounded-lg shadow-lg border-0"
+        title="Resume Live Preview"
+        [srcdoc]="renderedHtml()"
+      ></iframe>
+    } @else {
+      <div class="m-auto text-center py-20 text-slate-400">
+        <div class="text-4xl mb-2">📄</div>
+        <div class="text-sm font-medium">Loading Base Resume (Source of Truth)...</div>
+      </div>
+    }
+  </div>
+</app-card>

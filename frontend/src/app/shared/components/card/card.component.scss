@@ -1,0 +1,8 @@
+.app-card {
+  display: flex;
+  flex-direction: column;
+}
+
+:host {
+  display: block;
+}
