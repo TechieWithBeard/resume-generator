@@ -248,17 +248,30 @@ class AtsFormattingCheckpoint:
 
         # 1. Document Structure & Required Sections
         if eval_case.document_type == "cv":
-            required_sections = ["Strategic Motivation", "Executive Value Proposition", "Architectural Wins"]
+            required_checks = [
+                ("Strategic Motivation", ["strategic motivation"]),
+                ("Executive Value Proposition", ["executive value proposition"]),
+                ("Architectural Wins", ["architectural wins"]),
+            ]
         else:
-            required_sections = ["Professional Experience", "Education"]
+            required_checks = [
+                ("Professional Experience", ["professional experience", "experience"]),
+                ("Education", ["education"]),
+            ]
 
-        for sec in required_sections:
-            if sec.lower() not in rendered_html.lower():
-                defects.append(f"Missing required section: '{sec}'")
+        for sec_name, keywords in required_checks:
+            if not any(kw in rendered_html.lower() for kw in keywords):
+                defects.append(f"Missing required section: '{sec_name}'")
 
         # 2. ATS Inline Skills Architecture Check
-        # Ensures skills are rendered in clean categorized rows (.skill-row or <strong>Category:</strong>)
-        has_skill_row = 'class="skill-row"' in rendered_html or 'class="skill-group"' in rendered_html or '<strong>' in rendered_html
+        # Ensures skills are rendered in clean categorized rows or high-density skill pills
+        has_skill_row = (
+            'class="skill-row"' in rendered_html or
+            'class="skill-group"' in rendered_html or
+            'class="skill-pill"' in rendered_html or
+            'class="skills-pill-grid"' in rendered_html or
+            '<strong>' in rendered_html
+        )
         if not has_skill_row and tailored_resume.skills:
             defects.append("Skills section missing semantic categorized row layout")
 

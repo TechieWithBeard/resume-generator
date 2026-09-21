@@ -379,31 +379,46 @@ class TemplateEngine:
 
         use_icons = config.show_icons if config is not None else True
         icon_email = "✉ " if use_icons else ""
-        icon_phone = "☎ " if use_icons else ""
+        icon_phone = "📞 " if use_icons else ""
         icon_loc = "📍 " if use_icons else ""
         icon_linkedin = "🔗 " if use_icons else ""
         icon_github = "💻 " if use_icons else ""
 
         # Contact items
         contacts = []
-        if resume.email:
-            contacts.append(f'<span class="contact-item">{icon_email}{resume.email}</span>')
         if resume.phone:
-            contacts.append(f'<span class="contact-item">{icon_phone}{resume.phone}</span>')
-        if resume.location:
-            contacts.append(f'<span class="contact-item">{icon_loc}{resume.location}</span>')
-        if resume.linkedin:
-            contacts.append(f'<a href="{resume.linkedin}" target="_blank" class="contact-item">{icon_linkedin}LinkedIn</a>')
+            contacts.append(f'<span class="contact-item"><span class="contact-icon">{icon_phone}</span>{resume.phone}</span>')
+        if resume.email:
+            contacts.append(f'<span class="contact-item"><span class="contact-icon">{icon_email}</span>{resume.email}</span>')
         if resume.github:
-            contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item">{icon_github}GitHub</a>')
-        contact_html = " &bull; ".join(contacts)
+            contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item"><span class="contact-icon">{icon_github}</span>{resume.github}</a>')
+        elif resume.linkedin:
+            contacts.append(f'<a href="{resume.linkedin}" target="_blank" class="contact-item"><span class="contact-icon">{icon_linkedin}</span>{resume.linkedin}</a>')
+        if resume.location:
+            contacts.append(f'<span class="contact-item"><span class="contact-icon">{icon_loc}</span>{resume.location}</span>')
+        contact_html = "".join(contacts)
 
-        # Experience items
+        # Experience items (Left Column)
         exp_html = ""
         for exp in resume.experience:
             bullets = ""
             c_key = exp.company.strip().lower()
             relevant_base_bullets = base_bullets_by_company.get(c_key, all_base_bullets)
+
+            # Check if company string contains client annotation (e.g. "Parnasoft Technologies — Client: AVEVA")
+            comp_display = exp.company
+            client_bullet = ""
+            if " — Client: " in exp.company:
+                parts = exp.company.split(" — Client: ", 1)
+                comp_display = parts[0]
+                loc_client = f" - {exp.location}" if exp.location else ""
+                client_bullet = f'<li style="font-weight:600; color:#334155;">Client: {parts[1]}{loc_client}</li>\n'
+            elif " - Client: " in exp.company:
+                parts = exp.company.split(" - Client: ", 1)
+                comp_display = parts[0]
+                loc_client = f" - {exp.location}" if exp.location else ""
+                client_bullet = f'<li style="font-weight:600; color:#334155;">Client: {parts[1]}{loc_client}</li>\n'
+
             for h in exp.highlights:
                 if highlight_diff:
                     h_rendered, is_modified, has_target_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
@@ -422,100 +437,169 @@ class TemplateEngine:
                     bullet_badge = ""
                 bullets += f'<li class="{highlight_cls}">{bullet_badge}{h_rendered}</li>\n'
             
-            loc_str = f'<span class="exp-location">• {exp.location}</span>' if exp.location else ''
+            loc_str = f'&nbsp;&nbsp; <span class="meta-icon">📍</span> {exp.location}' if exp.location else ''
             exp_html += f"""
             <div class="experience-entry">
-                <div class="exp-header">
-                    <div class="exp-role-company">
-                        <span class="exp-role">{exp.role}</span>
-                        <span class="exp-sep">|</span>
-                        <span class="exp-company">{exp.company}</span>
-                    </div>
-                    <div class="exp-meta">
-                        <span class="exp-period">{exp.period}</span>
-                        {loc_str}
-                    </div>
-                </div>
+                <div class="exp-role">{exp.role}</div>
+                <div class="exp-company">{comp_display}</div>
+                <div class="exp-meta"><span class="meta-icon">📅</span> {exp.period}{loc_str}</div>
                 <ul class="exp-highlights">
-                    {bullets}
+                    {client_bullet}{bullets}
                 </ul>
             </div>
             """
 
-        # Skills categories
-        skills_html = ""
-        for cat_name, skill_list in resume.skills.items():
-            formatted_cat = cat_name.replace("_", " ").title()
-            items_rendered = []
-            for s in skill_list:
-                is_matched = highlight_diff and (s.lower() in target_terms or any(t in s.lower() for t in target_terms if len(t) > 3))
-                if is_matched:
-                    items_rendered.append(f'<span class="skill-item matched" style="background:#dcfce7; color:#166534; font-weight:600; padding:1px 4px; border-radius:2px;">✓ {s}</span>')
-                else:
-                    items_rendered.append(f'<span class="skill-item">{s}</span>')
-            items_str = ", ".join(items_rendered)
-            skills_html += f"""
-            <div class="skill-row">
-                <span class="skill-cat-title">{formatted_cat}:</span>
-                <span class="skill-cat-items">{items_str}</span>
-            </div>
-            """
-
-        # Projects
+        # Projects (Left Column, below Experience)
         projects_html = ""
         show_proj = config.show_projects if config is not None else True
         if show_proj and getattr(resume, "projects", None):
+            p_entries = []
             for proj in resume.projects:
-                tech_badges = "".join([f'<span class="tech-badge">{t}</span>' for t in proj.technologies])
                 url_link = f' <a href="{proj.url}" target="_blank" class="proj-link" title="Open Link">🔗</a>' if proj.url else ''
-                period_str = f'<span class="exp-period">{proj.period}</span>' if proj.period else ''
+                period_str = f'<div class="exp-meta"><span class="meta-icon">📅</span> {proj.period}</div>' if proj.period else ''
                 base_p_desc = base_projects_by_name.get(proj.name.strip().lower(), "")
                 rendered_p_desc = (
                     self.diff_text(proj.description, base_p_desc, target_terms)
                     if highlight_diff and proj.description
                     else proj.description
                 )
-                tech_container = f'<div class="proj-techs">{tech_badges}</div>' if tech_badges else ''
-                projects_html += f"""
+                
+                # Split description into bullet points if multi-sentence
+                sentences = [s.strip() for s in re.split(r'\.\s+(?=[A-Z])', rendered_p_desc) if s.strip()]
+                if len(sentences) > 1:
+                    p_bullets = "".join([f'<li>{s if s.endswith(".") else s + "."}</li>\n' for s in sentences])
+                elif sentences:
+                    p_bullets = f'<li>{sentences[0]}</li>\n'
+                else:
+                    p_bullets = ""
+                
+                tech_or_role = ", ".join(proj.technologies[:4]) if proj.technologies else (proj.role or "")
+                tech_sub = f'<div class="exp-company">{tech_or_role}</div>' if tech_or_role else ''
+
+                p_entries.append(f"""
                 <div class="project-entry">
-                    <div class="exp-header">
-                        <span class="exp-role">{proj.name}{url_link}</span>
-                        {period_str}
-                    </div>
-                    <div class="summary-text" style="margin-bottom: 4px;">{rendered_p_desc}</div>
-                    {tech_container}
+                    <div class="exp-role">{proj.name}{url_link}</div>
+                    {tech_sub}
+                    {period_str}
+                    <ul class="exp-highlights">
+                        {p_bullets}
+                    </ul>
                 </div>
-                """
+                """)
 
-        # Education
-        edu_html = ""
-        show_edu = config.show_education if config is not None else True
-        if show_edu and resume.education:
-            for edu in resume.education:
-                edu_html += f"""
-                <div class="education-entry">
-                    <div class="edu-degree-inst">
-                        <span class="edu-degree">{edu.degree}</span>
-                        <span class="edu-sep">—</span>
-                        <span class="edu-inst">{edu.institution}</span>
-                    </div>
-                    <span class="edu-period">{edu.period}</span>
-                </div>
-                """
+            projects_html = f"""
+            <div class="section">
+                <hr class="dotted-sep">
+                <div class="section-title">KEY PROJECTS & ARCHITECTURE</div>
+                {"".join(p_entries)}
+            </div>
+            """
 
-        # Certifications
+        # Right Column Sections:
+        # 1. Summary
+        summary_headline_parts = []
+        if resume.title:
+            summary_headline_parts.append(resume.title)
+        if getattr(resume, "skills", None) and "frontendArchitecture" in resume.skills:
+            summary_headline_parts.append(", ".join(resume.skills["frontendArchitecture"][:3]))
+        if getattr(resume, "target_company", None):
+            summary_headline_parts.append(f"Aligned for {resume.target_company}")
+        summary_headline_str = " &bull; ".join(summary_headline_parts) if summary_headline_parts else ""
+        summary_headline_html = f'<div class="summary-headline">{summary_headline_str}</div>' if summary_headline_str else ''
+
+        summary_diff_style = "background:#f0fdf4; border-left:3px solid #16a34a; padding:6px 8px; border-radius:0 4px 4px 0;" if is_summary_modified else ""
+        summary_html = f"""
+        <div class="section">
+            <div class="section-title">SUMMARY</div>
+            {summary_headline_html}
+            <div class="summary-text" style="{summary_diff_style}">{rendered_summary}</div>
+        </div>
+        """
+
+        # 2. Training / Courses
+        courses_items = []
+        if getattr(resume, "additional_sections", None):
+            courses_items = resume.additional_sections.get("training") or resume.additional_sections.get("courses") or []
+        if not courses_items and getattr(resume, "certifications", None):
+            for c in resume.certifications:
+                if "204" in c.name or "Course" in c.name or "Training" in c.name:
+                    courses_items.append(f"<strong>{c.name}</strong> - {c.issuer}")
+        
+        courses_html = ""
+        if courses_items:
+            c_html = "".join([f'<div class="side-entry"><div class="side-entry-title">{item}</div></div>' for item in courses_items])
+            courses_html = f"""
+            <div class="section">
+                <div class="section-title">TRAINING / COURSES</div>
+                {c_html}
+            </div>
+            """
+
+        # 3. Skills Pills
+        seen_skills = set()
+        skills_pills = []
+        for cat_name, skill_list in (resume.skills or {}).items():
+            for s in skill_list:
+                s_clean = s.strip()
+                if s_clean.lower() not in seen_skills:
+                    seen_skills.add(s_clean.lower())
+                    is_matched = highlight_diff and (
+                        s_clean.lower() in target_terms or any(t in s_clean.lower() for t in target_terms if len(t) > 3)
+                    )
+                    if is_matched:
+                        skills_pills.append(f'<span class="skill-pill matched">✓ {s_clean}</span>')
+                    else:
+                        skills_pills.append(f'<span class="skill-pill">{s_clean}</span>')
+
+        skills_html = f"""
+        <div class="section">
+            <div class="section-title" title="Technical Competencies">SKILLS <!-- Technical Competencies --></div>
+            <div class="skills-pill-grid">
+                {''.join(skills_pills)}
+            </div>
+        </div>
+        """
+
+        # 4. Certifications
         cert_html = ""
         show_cert = config.show_certifications if config is not None else True
         if show_cert and getattr(resume, "certifications", None):
+            cert_entries = ""
             for cert in resume.certifications:
                 yr = f" ({cert.year})" if cert.year else ""
                 url_str = f' <a href="{cert.url}" target="_blank" style="color:var(--accent-color); text-decoration:none;">🔗</a>' if cert.url else ""
-                cert_html += f"""
-                <div class="education-entry">
-                    <span class="edu-degree">{cert.name}</span>
-                    <span class="edu-inst">{cert.issuer}{yr}{url_str}</span>
+                cert_entries += f"""
+                <div class="side-entry">
+                    <div class="side-entry-title">{cert.name}</div>
+                    <div class="side-entry-sub">{cert.issuer}{yr}{url_str}</div>
                 </div>
                 """
+            cert_html = f"""
+            <div class="section">
+                <div class="section-title">CERTIFICATIONS</div>
+                {cert_entries}
+            </div>
+            """
+
+        # 5. Education
+        edu_html = ""
+        show_edu = config.show_education if config is not None else True
+        if show_edu and resume.education:
+            edu_entries = ""
+            for edu in resume.education:
+                edu_entries += f"""
+                <div class="side-entry">
+                    <div class="side-entry-title">{edu.degree}</div>
+                    <div class="side-entry-sub">{edu.institution}</div>
+                    <div class="side-entry-meta"><span class="meta-icon">📅</span> {edu.period}</div>
+                </div>
+                """
+            edu_html = f"""
+            <div class="section">
+                <div class="section-title">Education</div>
+                {edu_entries}
+            </div>
+            """
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -529,9 +613,9 @@ class TemplateEngine:
     --accent-color: #0284c7;
     --accent-light: #f0f9ff;
     --text-primary: #1e293b;
-    --text-muted: #64748b;
+    --text-muted: #475569;
     --border-color: #cbd5e1;
-    --divider-subtle: #e2e8f0;
+    --divider-subtle: #f1f5f9;
     --diff-bg: #f0fdf4;
     --diff-border: #16a34a;
   }}
@@ -544,151 +628,252 @@ class TemplateEngine:
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color: var(--text-primary);
     background-color: #f8fafc;
-    line-height: 1.5;
-    padding: 30px 20px;
+    line-height: 1.36;
+    padding: 24px 16px;
+    font-size: 8.5pt;
   }}
   .resume-paper {{
-    max-width: 850px;
+    max-width: 860px;
     margin: 0 auto;
     background: #ffffff;
-    padding: 44px 50px;
+    padding: 34px 40px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.06);
     border-radius: 4px;
+    height: auto !important;
+  }}
+  .ats-banner {{
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin-bottom: 16px;
+    text-align: center;
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #065f46;
+    letter-spacing: 0.2px;
+  }}
+  .ats-banner-check {{
+    color: #059669;
+    font-weight: 900;
+    margin-right: 4px;
   }}
   .header {{
-    border-bottom: 2px solid var(--primary-color);
-    padding-bottom: 14px;
-    margin-bottom: 18px;
+    margin-bottom: 14px;
+    padding-bottom: 0;
   }}
   .name {{
-    font-size: 24pt;
-    font-weight: 700;
+    font-size: 22pt;
+    font-weight: 800;
     color: var(--primary-color);
     letter-spacing: -0.3px;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
     text-transform: uppercase;
+    line-height: 1.15;
   }}
   .title-tagline {{
-    font-size: 11.5pt;
-    font-weight: 600;
+    font-size: 11pt;
+    font-weight: 700;
     color: var(--accent-color);
     margin-bottom: 8px;
     letter-spacing: 0.2px;
   }}
   .contacts {{
-    font-size: 9pt;
-    color: var(--text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    font-size: 8.5pt;
+    color: var(--text-primary);
+    font-weight: 500;
     line-height: 1.4;
   }}
-  .contacts a {{
-    color: var(--primary-color);
+  .contact-item {{
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-primary);
     text-decoration: none;
-    font-weight: 500;
   }}
-  .contacts a:hover {{
+  .contact-item a {{
+    color: var(--text-primary);
+    text-decoration: none;
+  }}
+  .contact-item a:hover {{
     color: var(--accent-color);
     text-decoration: underline;
   }}
+  .contact-icon {{
+    font-size: 9pt;
+  }}
+
+  /* Two Column Grid */
+  .resume-columns {{
+    display: grid;
+    grid-template-columns: 1.62fr 1fr;
+    column-gap: 22px;
+    align-items: start;
+  }}
+  .col-main {{
+    min-width: 0;
+  }}
+  .col-side {{
+    min-width: 0;
+  }}
+
   .section {{
-    margin-bottom: 18px;
+    margin-bottom: 13px;
   }}
   .section-title {{
     font-size: 10.5pt;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.6px;
     color: var(--primary-color);
-    border-bottom: 1.5px solid var(--primary-color);
-    padding-bottom: 4px;
-    margin-bottom: 10px;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 3px;
+    margin-bottom: 8px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: baseline;
   }}
-  .summary-text {{
-    font-size: 9.5pt;
-    color: var(--text-primary);
-    line-height: 1.55;
-    text-align: left;
+  .dotted-sep {{
+    border: none;
+    border-top: 1px dotted #cbd5e1;
+    margin: 12px 0 10px 0;
   }}
+
+  /* Experience / Main column items */
   .experience-entry {{
-    margin-bottom: 12px;
-    padding-bottom: 12px;
+    margin-bottom: 10px;
+    padding-bottom: 9px;
     border-bottom: 1px solid var(--divider-subtle);
-    page-break-inside: avoid;
     break-inside: avoid;
+    page-break-inside: avoid;
   }}
   .experience-entry:last-child {{
     border-bottom: none;
     padding-bottom: 0;
     margin-bottom: 0;
   }}
+  .exp-role {{
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: var(--primary-color);
+    line-height: 1.25;
+  }}
+  .exp-company {{
+    font-size: 9pt;
+    font-weight: 700;
+    color: var(--accent-color);
+    margin-top: 1px;
+    line-height: 1.25;
+  }}
+  .exp-meta {{
+    font-size: 8pt;
+    color: var(--text-muted);
+    margin: 2px 0 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }}
+  .exp-highlights {{
+    list-style-type: disc;
+    padding-left: 15px;
+    font-size: 8.5pt;
+    color: var(--text-primary);
+    line-height: 1.36;
+  }}
+  .exp-highlights li {{
+    margin-bottom: 2px;
+  }}
+
+  /* Projects */
   .project-entry {{
-    margin-bottom: 10px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--divider-subtle);
-    page-break-inside: avoid;
+    margin-bottom: 9px;
+    padding-bottom: 8px;
+    border-bottom: 1px dotted #e2e8f0;
     break-inside: avoid;
+    page-break-inside: avoid;
   }}
   .project-entry:last-child {{
     border-bottom: none;
     padding-bottom: 0;
     margin-bottom: 0;
   }}
-  .exp-header {{
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 5px;
-    flex-wrap: wrap;
-    gap: 4px;
-  }}
-  .exp-role-company {{
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 5px;
-  }}
-  .exp-role {{
-    font-size: 10.5pt;
-    font-weight: 700;
-    color: var(--primary-color);
-  }}
-  .exp-sep {{
-    color: #94a3b8;
-    margin: 0 1px;
-  }}
-  .exp-company {{
-    font-size: 10.5pt;
-    font-weight: 600;
+  .proj-link {{
     color: var(--accent-color);
-  }}
-  .exp-meta {{
-    text-align: right;
-    font-size: 9pt;
-    color: var(--text-muted);
-    white-space: nowrap;
-  }}
-  .exp-period {{
-    font-size: 9pt;
-    font-weight: 600;
-    color: #475569;
-  }}
-  .exp-location {{
-    font-size: 8.5pt;
-    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 8pt;
     margin-left: 4px;
   }}
-  .exp-highlights {{
-    list-style-type: disc;
-    padding-left: 18px;
-    font-size: 9.5pt;
+
+  /* Right column / Side items */
+  .summary-text {{
+    font-size: 8.5pt;
     color: var(--text-primary);
-    line-height: 1.5;
+    line-height: 1.4;
+    text-align: left;
   }}
-  .exp-highlights li {{
-    margin-bottom: 3.5px;
+  .summary-headline {{
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 4px;
+    line-height: 1.35;
   }}
+  .side-entry {{
+    margin-bottom: 8px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }}
+  .side-entry:last-child {{
+    margin-bottom: 0;
+  }}
+  .side-entry-title {{
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: var(--primary-color);
+    line-height: 1.25;
+  }}
+  .side-entry-sub {{
+    font-size: 8pt;
+    color: var(--text-muted);
+    line-height: 1.25;
+    margin-top: 1px;
+  }}
+  .side-entry-meta {{
+    font-size: 7.5pt;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }}
+
+  /* Skill Pills */
+  .skills-pill-grid {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+  }}
+  .skill-pill {{
+    display: inline-block;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #1e293b;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 7.8pt;
+    font-weight: 600;
+    line-height: 1.25;
+  }}
+  .skill-pill.matched {{
+    background: #dcfce7 !important;
+    border-color: #86efac !important;
+    color: #166534 !important;
+    font-weight: 700 !important;
+  }}
+
+  /* Diff styles */
   .highlighted-bullet {{
     background-color: var(--diff-bg);
     border-left: 3px solid var(--diff-border);
@@ -743,8 +928,51 @@ class TemplateEngine:
     font-weight: 800 !important;
     text-decoration: underline;
   }}
+
+  /* Print Stylesheet strictly enforcing 1-2 pages maximum */
+  @page {{
+    size: letter portrait;
+    margin: 8mm 10mm;
+  }}
   @media print {{
-    del.git-diff-del {{ display: none !important; }}
+    html, body {{
+      background: #ffffff !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      height: auto !important;
+      min-height: 0 !important;
+      font-size: 8pt !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }}
+    .resume-paper {{
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      max-width: 100% !important;
+      width: 100% !important;
+      border: none !important;
+      height: auto !important;
+      min-height: 0 !important;
+    }}
+    .ats-banner {{
+      display: none !important;
+    }}
+    .cv-diff-banner {{
+      display: none !important;
+    }}
+    .resume-columns {{
+      display: grid !important;
+      grid-template-columns: 1.62fr 1fr !important;
+      column-gap: 18px !important;
+    }}
+    .experience-entry, .project-entry, .side-entry {{
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }}
+    del.git-diff-del {{
+      display: none !important;
+    }}
     ins.git-diff-ins, mark.diff-text-added, mark.diff-text-adapted, mark.diff-kw-term {{
       background-color: transparent !important;
       color: inherit !important;
@@ -752,7 +980,6 @@ class TemplateEngine:
       box-shadow: none !important;
       border: none !important;
       padding: 0 !important;
-      text-decoration: none !important;
     }}
     .diff-sign {{ display: none !important; }}
     strong.diff-kw-match {{
@@ -761,171 +988,38 @@ class TemplateEngine:
       text-decoration: none !important;
     }}
   }}
-  .skill-row {{
-    display: flex;
-    align-items: baseline;
-    margin-bottom: 5px;
-    font-size: 9.5pt;
-    line-height: 1.5;
-  }}
-  .skill-cat-title {{
-    font-weight: 700;
-    color: var(--primary-color);
-    width: 170px;
-    flex-shrink: 0;
-  }}
-  .skill-cat-items {{
-    color: var(--text-primary);
-    flex-grow: 1;
-  }}
-  .skill-item {{
-    display: inline;
-  }}
-  .skill-item.matched {{
-    background-color: #dcfce7;
-    color: #166534;
-    font-weight: 600;
-    padding: 0 3px;
-    border-radius: 2px;
-  }}
-  .skill-group {{
-    display: flex;
-    align-items: center;
-    margin-bottom: 6px;
-    font-size: 9.5pt;
-  }}
-  .skill-label {{
-    font-weight: 600;
-    width: 170px;
-    flex-shrink: 0;
-    color: var(--primary-color);
-  }}
-  .skill-badges {{
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }}
-  .skill-badge {{
-    background: #f1f5f9;
-    color: #334155;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 8.5pt;
-    font-weight: 500;
-    border: 1px solid #e2e8f0;
-  }}
-  .tech-badge {{
-    background: #f1f5f9;
-    color: #334155;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 8pt;
-    margin-right: 4px;
-    border: 1px solid #e2e8f0;
-    display: inline-block;
-  }}
-  .proj-techs {{
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 4px;
-  }}
-  .proj-link {{
-    color: var(--accent-color);
-    text-decoration: none;
-    font-size: 8pt;
-    margin-left: 4px;
-  }}
-  .education-entry {{
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 9.5pt;
-    margin-bottom: 5px;
-    padding-bottom: 4px;
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }}
-  .edu-degree-inst {{
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 4px;
-  }}
-  .edu-degree {{
-    font-weight: 700;
-    color: var(--primary-color);
-  }}
-  .edu-sep {{
-    color: #94a3b8;
-    margin: 0 2px;
-  }}
-  .edu-inst {{
-    color: var(--text-primary);
-  }}
-  .edu-period {{
-    color: var(--text-muted);
-    font-weight: 500;
-    font-size: 9pt;
-  }}
-
-  @media print {{
-    body {{
-      background: #ffffff !important;
-      padding: 0 !important;
-      margin: 0 !important;
-    }}
-    .resume-paper {{
-      box-shadow: none !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      max-width: 100% !important;
-    }}
-    .highlighted-bullet {{
-      background-color: transparent !important;
-      border-left: none !important;
-      padding-left: 0 !important;
-    }}
-    .experience-entry, .project-entry {{
-      border-bottom-color: #e2e8f0 !important;
-    }}
-    @page {{
-      margin: 1.2cm 1.5cm;
-      size: letter portrait;
-    }}
-  }}
   {self._build_dynamic_styles(config)}
 </style>
 </head>
 <body>
 <div class="resume-paper">
   {diff_legend_html}
+  <div class="ats-banner">
+    <span class="ats-banner-check">✓</span> ATS-tested template • built to parse more cleanly
+  </div>
   <div class="header">
     <div class="name">{resume.name}</div>
     {f'<div class="title-tagline">{resume.title}' + (f' • {resume.tagline}' if (config is None or config.show_tagline) and resume.tagline else '') + '</div>' if resume.title else ''}
     <div class="contacts">{contact_html}</div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Professional Summary {f'<span style="background:#dcfce7; color:#15803d; font-size:7.5pt; font-weight:800; padding:2px 6px; border-radius:3px; text-transform:uppercase; margin-left:8px; border:1px solid #bbf7d0;">+ Tailored for {target_role or "Role"}</span>' if is_summary_modified else ''}</div>
-    <div class="summary-text" style="{f'background:#f0fdf4; border-left:3px solid #16a34a; padding:8px 12px; border-radius:0 4px 4px 0;' if is_summary_modified else ''}">{rendered_summary}</div>
+  <div class="resume-columns">
+    <div class="col-main">
+      <div class="section">
+        <div class="section-title">EXPERIENCE</div>
+        {exp_html}
+      </div>
+      {projects_html}
+    </div>
+
+    <div class="col-side">
+      {summary_html}
+      {courses_html}
+      {skills_html}
+      {cert_html}
+      {edu_html}
+    </div>
   </div>
-
-  <div class="section">
-    <div class="section-title">Technical Competencies</div>
-    {skills_html}
-  </div>
-
-  <div class="section">
-    <div class="section-title">Professional Experience</div>
-    {exp_html}
-  </div>
-
-  {f'<div class="section"><div class="section-title">Key Projects & Architecture</div>{projects_html}</div>' if projects_html else ''}
-
-  {f'<div class="section"><div class="section-title">Education</div>{edu_html}</div>' if edu_html else ''}
-
-  {f'<div class="section"><div class="section-title">Certifications & Credentials</div>{cert_html}</div>' if cert_html else ''}
 </div>
 </body>
 </html>
