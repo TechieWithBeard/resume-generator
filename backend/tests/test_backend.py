@@ -9,6 +9,7 @@ Tests:
 
 import unittest
 import asyncio
+import json
 from backend.app.models.resume import (
     ResumeData,
     ExperienceItem,
@@ -239,6 +240,48 @@ class TestResumeGenerator(unittest.TestCase):
         self.assertIn("Curriculum Vitae", gen_html)
         self.assertIn("Mission-Critical Monorepo", gen_html)
         self.assertIn("Principal Frontend Architect", gen_html)
+
+    def test_resume_score_checker_and_endpoints(self):
+        """Verifies 9-dimension Resume Score Checker and /api/resume/score endpoints."""
+        from backend.app.services.resume_score_checker import resume_score_checker
+        from backend.app.main import app
+
+        # Direct service audit
+        base = resume_store.get_base_resume()
+        html = template_engine.render(base)
+        score_data = resume_score_checker.audit(base, rendered_html=html)
+        self.assertGreaterEqual(score_data["overall_score"], 90)
+        self.assertTrue(score_data["passed"])
+        self.assertEqual(len(score_data["dimensions"]), 9)
+        for dim in [
+            "customization", "spelling_and_grammar", "summary_statement", "measurable_results",
+            "word_choice", "formatting", "optimal_length", "contact_information", "comprehensiveness"
+        ]:
+            self.assertIn(dim, score_data["dimensions"])
+
+        # ASGI GET /api/resume/score
+        async def run():
+            rec_get = []
+            async def send_get(msg): rec_get.append(msg)
+            async def rec_body(): return {"type": "http.request", "body": b"", "more_body": False}
+            await app({"type": "http", "method": "GET", "path": "/api/resume/score", "headers": []}, rec_body, send_get)
+            body = next(m for m in rec_get if m["type"] == "http.response.body")["body"]
+            res = json.loads(body.decode("utf-8"))
+            self.assertIn("overall_score", res)
+            self.assertGreaterEqual(res["overall_score"], 90)
+
+            # ASGI POST /api/resume/score
+            rec_post = []
+            async def send_post(msg): rec_post.append(msg)
+            p_payload = json.dumps({"target_role": "Senior Frontend Engineer"}).encode("utf-8")
+            async def rec_post_body(): return {"type": "http.request", "body": p_payload, "more_body": False}
+            await app({"type": "http", "method": "POST", "path": "/api/resume/score", "headers": []}, rec_post_body, send_post)
+            p_body = next(m for m in rec_post if m["type"] == "http.response.body")["body"]
+            p_res = json.loads(p_body.decode("utf-8"))
+            self.assertIn("overall_score", p_res)
+            self.assertIn("A+", p_res["grade"])
+
+        asyncio.run(run())
 
 
 if __name__ == "__main__":

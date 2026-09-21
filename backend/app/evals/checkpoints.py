@@ -302,6 +302,19 @@ class AtsFormattingCheckpoint:
         if "@page" not in rendered_html and "cv_executive" not in eval_case.template_id:
             defects.append("Missing '@page' print margin definition")
 
+        # 6. Integrate 9-Dimension Quality Score Audit
+        quality_audit = {}
+        try:
+            from backend.app.services.resume_score_checker import resume_score_checker
+            quality_audit = resume_score_checker.audit(
+                tailored_resume,
+                rendered_html=rendered_html,
+                target_role=eval_case.job_input.target_title,
+                job_description=eval_case.job_input.job_description,
+            )
+        except Exception as e:
+            quality_audit = {"error": str(e)}
+
         passed = len(defects) == 0
         score = 1.0 if passed else max(0.0, 1.0 - (0.25 * len(defects)))
         msg = "ATS formatting and visual divider architecture 100% compliant." if passed else f"ATS formatting defects found: {len(defects)} issue(s)."
@@ -313,7 +326,7 @@ class AtsFormattingCheckpoint:
             score=round(score, 3),
             threshold=1.0,
             message=msg,
-            details={"defects": defects},
+            details={"defects": defects, "quality_audit": quality_audit},
         )
 
 

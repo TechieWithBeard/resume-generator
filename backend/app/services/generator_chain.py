@@ -449,11 +449,20 @@ class GeneratorChain:
             verified_resume, template_id=effective_template_id, highlight_diff=False, base_resume=base_resume
         )
 
+        from backend.app.services.resume_score_checker import resume_score_checker
+        score_report = resume_score_checker.audit(
+            verified_resume,
+            rendered_html=rendered_html,
+            target_role=target_role,
+            job_description=job_text,
+        )
+
         yield {
             "type": "complete",
             "resume": verified_resume.model_dump(),
             "html": rendered_html,
             "audit": audit_report.model_dump(),
+            "score_report": score_report,
             "timestamp": now_str(),
         }
 

@@ -23,6 +23,7 @@ from backend.app.models.resume import (
 from backend.app.services.generator_chain import generator_chain
 from backend.app.services.linkedin_extractor import linkedin_extractor
 from backend.app.services.resume_parser import resume_parser
+from backend.app.services.resume_score_checker import resume_score_checker
 from backend.app.services.resume_store import resume_store
 from backend.app.services.template_engine import template_engine
 
@@ -360,6 +361,47 @@ async def app(scope, receive, send):
             status, headers, body = send_json(report.model_dump())
         else:
             status, headers, body = send_json({"message": "No evaluation run recorded yet. POST /api/evals/run to execute."}, status=404)
+        await send({"type": "http.response.start", "status": status, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+        return
+
+    # Route: GET /api/resume/score (Audit Base Profile)
+    if path == "/api/resume/score" and method == "GET":
+        base = resume_store.get_base_resume()
+        html = template_engine.render(base)
+        score_report = resume_score_checker.audit(
+            base, rendered_html=html, target_role="Senior Frontend Engineer"
+        )
+        status, headers, body = send_json(score_report)
+        await send({"type": "http.response.start", "status": status, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+        return
+
+    # Route: POST /api/resume/score (Audit Tailored Profile or Custom Payload)
+    if path == "/api/resume/score" and method == "POST":
+        try:
+            raw_body = await read_body(receive)
+            data = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+        except Exception:
+            data = {}
+
+        if "resume" in data and data["resume"]:
+            resume_obj = ResumeData.model_validate(data["resume"])
+        else:
+            resume_obj = resume_store.get_base_resume()
+
+        target_role = data.get("target_role") or getattr(resume_obj, "target_role", None)
+        job_desc = data.get("job_description")
+        tmpl_id = data.get("template_id", "modern")
+
+        html = template_engine.render(resume_obj, template_id=tmpl_id)
+        score_report = resume_score_checker.audit(
+            resume_obj,
+            rendered_html=html,
+            target_role=target_role,
+            job_description=job_desc,
+        )
+        status, headers, body = send_json(score_report)
         await send({"type": "http.response.start", "status": status, "headers": headers})
         await send({"type": "http.response.body", "body": body})
         return
