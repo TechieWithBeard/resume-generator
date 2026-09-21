@@ -45,11 +45,11 @@ export class ResumeGeneratorService {
   readonly defaultTemplateConfig: TemplateConfig = {
     template_id: 'modern',
     primary_color: '#0284c7',
-    accent_color: '#0369a1',
-    text_color: '#0f172a',
+    accent_color: '#0284c7',
+    text_color: '#1e293b',
     font_family: 'system-ui, -apple-system, sans-serif',
-    font_size: '14px',
-    line_height: '1.5',
+    font_size: '11.5px',
+    line_height: '1.36',
     density: 'normal',
     header_layout: 'left',
     show_tagline: true,
@@ -57,13 +57,21 @@ export class ResumeGeneratorService {
     show_projects: true,
     show_certifications: true,
     show_education: true,
+    custom_css: '',
   };
 
   private loadInitialTemplateConfig(): TemplateConfig {
     try {
       const saved = localStorage.getItem('resume_template_config');
       if (saved) {
-        return { ...this.defaultTemplateConfig, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        if (parsed.font_size && (parsed.font_size === '14px' || parseFloat(parsed.font_size) >= 13.8)) {
+          parsed.font_size = '11.5px';
+        }
+        if (parsed.line_height && (parsed.line_height === '1.5' || parseFloat(parsed.line_height) >= 1.48)) {
+          parsed.line_height = '1.36';
+        }
+        return { ...this.defaultTemplateConfig, ...parsed };
       }
     } catch (_) {}
     return { ...this.defaultTemplateConfig };

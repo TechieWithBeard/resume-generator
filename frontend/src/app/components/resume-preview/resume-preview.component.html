@@ -199,13 +199,15 @@
     <div class="p-4 sm:p-6 bg-slate-200/80 flex-1 flex justify-center items-start min-h-[720px] overflow-auto">
       @if (renderedHtml()) {
         <div
-          class="w-full flex justify-center"
+          class="max-w-[860px] w-full mx-auto flex justify-center"
           [style.transform]="previewZoom() !== 100 ? 'scale(' + (previewZoom() / 100) + ')' : null"
           style="transform-origin: top center; transition: transform 0.15s ease-out;"
         >
           <iframe
             #resumeIframe
-            class="resume-frame w-full h-full min-h-[860px] bg-white rounded-lg shadow-xl border-0"
+            (load)="onIframeLoad($event)"
+            class="resume-frame w-full bg-transparent border-0"
+            style="min-height: 900px; width: 100%; transition: height 0.15s ease-out;"
             title="Resume Live Preview"
             [srcdoc]="renderedHtml()"
           ></iframe>
@@ -237,7 +239,10 @@
           >
             @if (baseRenderedHtml()) {
               <iframe
-                class="resume-frame base-resume-frame w-full h-full min-h-[820px] bg-white border-0"
+                #baseResumeIframe
+                (load)="onIframeLoad($event)"
+                class="resume-frame base-resume-frame w-full bg-transparent border-0"
+                style="min-height: 820px;"
                 title="Base Resume Source of Truth"
                 [srcdoc]="baseRenderedHtml()"
               ></iframe>
@@ -267,7 +272,10 @@
           >
             @if (renderedHtml()) {
               <iframe
-                class="resume-frame tailored-resume-frame w-full h-full min-h-[820px] bg-white border-0"
+                #tailoredResumeIframe
+                (load)="onIframeLoad($event)"
+                class="resume-frame tailored-resume-frame w-full bg-transparent border-0"
+                style="min-height: 820px;"
                 title="Tailored Resume with Diff Highlighting"
                 [srcdoc]="renderedHtml()"
               ></iframe>

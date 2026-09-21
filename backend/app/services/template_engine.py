@@ -45,6 +45,12 @@ class TemplateEngine:
     def list_templates(self) -> List[Dict[str, Any]]:
         return self.TEMPLATES
 
+    GOOGLE_FONTS_TAG = (
+        '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+        '<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">'
+    )
+
     def _build_dynamic_styles(self, config: Optional[TemplateConfig]) -> str:
         if not config:
             return ""
@@ -52,46 +58,45 @@ class TemplateEngine:
         density = config.density
         if density == "compact":
             padding = "28px 36px"
-            section_margin = "14px"
-            item_margin = "10px"
-            bullet_margin = "2px"
-            line_height = config.line_height or "1.35"
+            section_margin = "10px"
+            item_margin = "7px"
+            bullet_margin = "1px"
+            line_height = config.line_height or "1.30"
         elif density == "comfortable":
             padding = "54px 58px"
-            section_margin = "26px"
-            item_margin = "18px"
-            bullet_margin = "6px"
-            line_height = config.line_height or "1.65"
-        else: # normal
-            padding = "44px 48px"
-            section_margin = "20px"
+            section_margin = "18px"
             item_margin = "14px"
             bullet_margin = "4px"
-            line_height = config.line_height or "1.5"
+            line_height = config.line_height or "1.48"
+        else: # normal
+            padding = "34px 40px"
+            section_margin = "13px"
+            item_margin = "10px"
+            bullet_margin = "2px"
+            line_height = config.line_height or "1.36"
 
         header_css = ""
         if config.header_layout == "center":
             header_css = """
-            .header { text-align: center !important; display: block !important; }
-            .name, h1 { text-align: center !important; }
-            .contacts { justify-content: center !important; text-align: center !important; display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
-            .title-tagline { text-align: center !important; }
+            .header { text-align: center !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
+            .header-info, .name, h1, .title-tagline { text-align: center !important; width: 100% !important; }
+            .contacts { justify-content: center !important; text-align: center !important; display: flex !important; flex-wrap: wrap !important; gap: 10px !important; margin-top: 6px !important; width: 100% !important; }
             """
         elif config.header_layout == "split":
             header_css = """
             .header { display: flex !important; justify-content: space-between !important; align-items: flex-end !important; flex-wrap: wrap !important; gap: 12px !important; text-align: left !important; }
-            .name, h1 { text-align: left !important; }
-            .contacts { text-align: right !important; justify-content: flex-end !important; display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
-            .title-tagline { text-align: left !important; }
+            .header-info { text-align: left !important; min-width: 0 !important; }
+            .name, h1, .title-tagline { text-align: left !important; }
+            .contacts { text-align: right !important; justify-content: flex-end !important; display: flex !important; flex-wrap: wrap !important; gap: 10px !important; max-width: 55% !important; }
             """
         elif config.header_layout == "left":
             header_css = """
             .header { text-align: left !important; display: block !important; }
-            .name, h1 { text-align: left !important; }
-            .contacts { justify-content: flex-start !important; text-align: left !important; display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
-            .title-tagline { text-align: left !important; }
+            .header-info, .name, h1, .title-tagline { text-align: left !important; }
+            .contacts { justify-content: flex-start !important; text-align: left !important; display: flex !important; flex-wrap: wrap !important; gap: 10px !important; margin-top: 6px !important; }
             """
 
+        font_size = config.font_size or "11.5px"
         return f"""
         /* User Configured Dynamic Overrides */
         :root {{
@@ -99,42 +104,63 @@ class TemplateEngine:
             --accent-color: {config.accent_color} !important;
             --text-primary: {config.text_color} !important;
             --font-family: {config.font_family} !important;
-            --font-size: {config.font_size} !important;
+            --font-size: {font_size} !important;
             --line-height: {line_height} !important;
         }}
         body, body * {{
             font-family: var(--font-family) !important;
         }}
         pre, code, .diff-sign, .font-mono, [class*="mono"] {{
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+            font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
         }}
         body {{
             color: var(--text-primary) !important;
             line-height: var(--line-height) !important;
+            font-size: var(--font-size) !important;
         }}
-        body, p, li, .summary-text, .exp-highlights, .project-highlights, .contacts, .exp-period, .edu-item, .edu-period, .skill-badge, .skill-cat-title, .skill-cat-items, .skill-row, .skill-item, .tech-badge {{
+        p, li, .summary-text, .exp-highlights, .project-highlights, .contacts, .side-entry-sub, .side-entry-meta {{
             font-size: var(--font-size) !important;
             line-height: var(--line-height) !important;
         }}
-        .name, h1, .sec-heading, .section-title, .cv-section-title, .cv-section-title-alt, .cv-project-title, .exp-role, .project-name {{
+        .name, h1 {{
             color: var(--primary-color) !important;
+            font-size: calc(var(--font-size) * 2.3) !important;
+            line-height: 1.15 !important;
         }}
-        .header, .sec-heading, .section-title, .cv-section-title {{
-            border-bottom-color: var(--accent-color) !important;
+        .sec-heading, .section-title, .cv-section-title, .cv-section-title-alt {{
+            color: var(--primary-color) !important;
+            border-bottom-color: var(--primary-color) !important;
+            font-size: calc(var(--font-size) * 1.2) !important;
+        }}
+        .exp-role, .project-name, .cv-project-title {{
+            color: var(--primary-color) !important;
+            font-size: calc(var(--font-size) * 1.1) !important;
         }}
         .title-tagline, .title, .exp-company, .cv-project-role, .edu-degree, .target-company, .skill-label {{
             color: var(--accent-color) !important;
         }}
-        a, .contacts a {{
-            color: var(--primary-color) !important;
+        a, .contacts a, .proj-link {{
+            color: var(--accent-color) !important;
         }}
         .cv-badge, .badge, .tag-primary {{
             background-color: var(--primary-color) !important;
             color: #ffffff !important;
         }}
         @media screen {{
+            body {{
+                background-color: transparent !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }}
             .resume-paper, .paper {{
                 padding: {padding} !important;
+                background: #ffffff !important;
+                max-width: 840px !important;
+                width: 100% !important;
+                margin: 0 auto !important;
+                box-shadow: 0 4px 24px -2px rgba(15, 23, 42, 0.12) !important;
+                border-radius: 6px !important;
+                border: 1px solid #e2e8f0 !important;
             }}
         }}
         @media print {{
@@ -147,13 +173,15 @@ class TemplateEngine:
                 padding: 0 !important;
                 margin: 0 !important;
                 box-shadow: none !important;
+                border: none !important;
                 max-width: 100% !important;
+                width: 100% !important;
             }}
         }}
         .section, .cv-section {{
             margin-bottom: {section_margin} !important;
         }}
-        .experience-entry, .project-card, .project-entry, .cv-project-card, .education-entry, .edu-item, .cv-entry, .cert-entry {{
+        .experience-entry, .project-card, .project-entry, .cv-project-card, .education-entry, .edu-item, .cv-entry, .cert-entry, .side-entry {{
             margin-bottom: {item_margin} !important;
         }}
         .exp-highlights li, .project-highlights li {{
@@ -285,6 +313,14 @@ class TemplateEngine:
         config: Optional[TemplateConfig] = None,
     ) -> str:
         """Renders the resume or CV data into a standalone, printable HTML document."""
+        config_passed = config is not None
+        if config is None:
+            try:
+                from .resume_store import resume_store
+                config = resume_store.get_template_config()
+            except Exception:
+                config = TemplateConfig()
+
         if base_resume is None:
             try:
                 from .resume_store import resume_store
@@ -293,7 +329,17 @@ class TemplateEngine:
                 pass
 
         doc_type = getattr(resume, "document_type", "resume")
-        effective_tmpl = (config.template_id if config and config.template_id else template_id)
+        if config_passed and config and config.template_id and config.template_id != "modern":
+            effective_tmpl = config.template_id
+        elif template_id and template_id != "modern":
+            effective_tmpl = template_id
+        elif doc_type == "cv" and (not config_passed or (config and config.template_id == "cv_executive")):
+            effective_tmpl = "cv_executive"
+        elif config and config.template_id:
+            effective_tmpl = config.template_id
+        else:
+            effective_tmpl = template_id or "modern"
+
         if effective_tmpl == "cv_executive":
             return self._render_cv_executive(resume, highlight_diff, base_resume, config=config)
         elif effective_tmpl == "executive":
@@ -607,6 +653,7 @@ class TemplateEngine:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{resume.name} - Resume</title>
+{self.GOOGLE_FONTS_TAG}
 <style>
   :root {{
     --primary-color: #0f172a;
@@ -627,18 +674,20 @@ class TemplateEngine:
   body {{
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color: var(--text-primary);
-    background-color: #f8fafc;
+    background-color: transparent;
     line-height: 1.36;
-    padding: 24px 16px;
+    padding: 0;
+    margin: 0;
     font-size: 8.5pt;
   }}
   .resume-paper {{
-    max-width: 860px;
+    max-width: 840px;
     margin: 0 auto;
     background: #ffffff;
     padding: 34px 40px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-    border-radius: 4px;
+    box-shadow: 0 4px 24px -2px rgba(15, 23, 42, 0.12);
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
     height: auto !important;
   }}
   .ats-banner {{
@@ -998,8 +1047,10 @@ class TemplateEngine:
     <span class="ats-banner-check">✓</span> ATS-tested template • built to parse more cleanly
   </div>
   <div class="header">
-    <div class="name">{resume.name}</div>
-    {f'<div class="title-tagline">{resume.title}' + (f' • {resume.tagline}' if (config is None or config.show_tagline) and resume.tagline else '') + '</div>' if resume.title else ''}
+    <div class="header-info">
+      <div class="name">{resume.name}</div>
+      {f'<div class="title-tagline">{resume.title}' + (f' • {resume.tagline}' if (config is None or config.show_tagline) and resume.tagline else '') + '</div>' if resume.title else ''}
+    </div>
     <div class="contacts">{contact_html}</div>
   </div>
 
@@ -1187,9 +1238,10 @@ class TemplateEngine:
 <head>
 <meta charset="UTF-8">
 <title>{resume.name} - Executive Resume</title>
+{self.GOOGLE_FONTS_TAG}
 <style>
-  body {{ font-family: "Georgia", Times, serif; color: #111; line-height: 1.4; padding: 30px 20px; background: #fafafa; }}
-  .paper, .resume-paper {{ max-width: 820px; margin: 0 auto; background: #fff; padding: 40px 50px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }}
+  body {{ font-family: "Georgia", Times, serif; color: #111; line-height: 1.4; padding: 0; margin: 0; background: transparent; }}
+  .paper, .resume-paper {{ max-width: 840px; margin: 0 auto; background: #fff; padding: 36px 44px; box-shadow: 0 4px 24px -2px rgba(15, 23, 42, 0.12); border-radius: 6px; border: 1px solid #e2e8f0; }}
   h1, .name {{ text-align: center; font-size: 24pt; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }}
   .title, .title-tagline {{ text-align: center; font-size: 11pt; font-style: italic; margin-bottom: 4px; }}
   .contacts {{ text-align: center; font-size: 9.5pt; border-bottom: 2px solid #222; padding-bottom: 12px; margin-bottom: 18px; }}
@@ -1269,8 +1321,10 @@ class TemplateEngine:
 <div class="resume-paper">
   {diff_legend_html}
   <div class="header">
-    <h1 class="name">{resume.name}</h1>
-    <div class="title-tagline">{resume.title}{tagline_html}</div>
+    <div class="header-info">
+      <h1 class="name">{resume.name}</h1>
+      <div class="title-tagline">{resume.title}{tagline_html}</div>
+    </div>
     <div class="contacts">{contact_html}</div>
   </div>
 
@@ -1607,6 +1661,7 @@ class TemplateEngine:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{resume.name} - Curriculum Vitae &amp; Statement of Strategic Alignment</title>
+{self.GOOGLE_FONTS_TAG}
 <style>
   :root {{
     --primary-color: #0f172a;
@@ -1624,17 +1679,19 @@ class TemplateEngine:
   body {{
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color: var(--text-primary);
-    background: var(--bg-page);
+    background: transparent;
     line-height: 1.5;
-    padding: 30px 15px;
+    padding: 0;
+    margin: 0;
   }}
-  .paper {{
-    max-width: 880px;
+  .paper, .resume-paper {{
+    max-width: 860px;
     margin: 0 auto;
-    background: #ffffff;
-    padding: 44px 52px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    border-radius: 4px;
+    background: var(--bg-card);
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 40px 48px;
+    box-shadow: 0 4px 24px -2px rgba(15, 23, 42, 0.12);
     border-top: 4px solid var(--accent-color);
   }}
   .header-top-row {{

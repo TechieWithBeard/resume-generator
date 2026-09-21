@@ -147,12 +147,12 @@
               [ngModel]="draftConfig().font_size"
               (ngModelChange)="updateField('font_size', $event, 0)"
             >
-              <option value="12px">12.0px (Ultra Compact)</option>
-              <option value="12.5px">12.5px (Dense)</option>
-              <option value="13px">13.0px (Compact)</option>
-              <option value="13.5px">13.5px (Standard)</option>
-              <option value="14px">14.0px (Comfortable)</option>
-              <option value="14.5px">14.5px (Editorial)</option>
+              <option value="10.5px">10.5px (Dense &bull; 1-Page Budget)</option>
+              <option value="11px">11.0px (Compact)</option>
+              <option value="11.5px">11.5px (Standard ATS Optimal)</option>
+              <option value="12px">12.0px (Comfortable)</option>
+              <option value="12.5px">12.5px (Spacious)</option>
+              <option value="13px">13.0px (Large / Executive)</option>
             </select>
           </div>
           <div>
@@ -162,11 +162,11 @@
               [ngModel]="draftConfig().line_height"
               (ngModelChange)="updateField('line_height', $event, 0)"
             >
-              <option value="1.3">Dense (1.30)</option>
-              <option value="1.35">Tight (1.35)</option>
-              <option value="1.45">Balanced (1.45)</option>
-              <option value="1.5">Standard (1.50)</option>
-              <option value="1.6">Relaxed (1.60)</option>
+              <option value="1.28">Dense (1.28)</option>
+              <option value="1.32">Compact (1.32)</option>
+              <option value="1.36">Standard Optimal (1.36)</option>
+              <option value="1.42">Comfortable (1.42)</option>
+              <option value="1.5">Relaxed (1.50)</option>
             </select>
           </div>
         </div>
@@ -289,22 +289,216 @@
         </div>
       </div>
 
-      <!-- 6. Custom CSS (Optional) -->
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2.5">
+      <!-- 6. Custom CSS & Style Tokens (Optional) -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
         <div class="flex items-center justify-between cursor-pointer" (click)="showCustomCss.set(!showCustomCss())">
-          <label class="text-xs font-bold uppercase tracking-wider text-slate-700 cursor-pointer">6. Custom CSS (Optional)</label>
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-700 cursor-pointer">6. Custom CSS (Optional)</label>
+            <span class="text-[10px] font-semibold text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">Live Reactive</span>
+          </div>
           <span class="text-xs text-sky-600 font-semibold select-none">{{ showCustomCss() ? '▲ Hide' : '▼ Expand' }}</span>
         </div>
+
         @if (showCustomCss()) {
-          <div class="pt-1">
-            <textarea
-              rows="3"
-              placeholder=".section-title { letter-spacing: 1px; }"
-              class="w-full p-2 text-[11px] font-mono bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 resize-none text-slate-800"
-              [ngModel]="draftConfig().custom_css"
-              (ngModelChange)="updateField('custom_css', $event, 250)"
-            ></textarea>
-            <span class="text-[10px] text-slate-400">Injected directly into the document stylesheet.</span>
+          <div class="space-y-2.5 pt-1">
+            <!-- Documentation Reference Toggle & Quick Action Bar -->
+            <div class="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-md transition-all shadow-sm cursor-pointer"
+                [ngClass]="showTokenDocs() ? 'bg-sky-600 text-white' : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'"
+                (click)="showTokenDocs.set(!showTokenDocs())"
+                title="Open exposed style token variables and CSS selectors reference guide"
+              >
+                <span>📖</span>
+                <span>{{ showTokenDocs() ? 'Close Reference Guide' : 'Style Tokens & Selectors Guide' }}</span>
+                <span class="text-[10px] opacity-80 font-normal">({{ showTokenDocs() ? 'Hide' : '11 tokens &bull; 16 classes' }})</span>
+              </button>
+
+              @if (draftConfig().custom_css) {
+                <button
+                  type="button"
+                  class="text-[11px] text-red-600 hover:text-red-700 font-semibold cursor-pointer px-1.5 py-0.5 rounded hover:bg-red-50"
+                  (click)="clearCustomCss()"
+                  title="Clear custom CSS"
+                >
+                  ✕ Clear CSS
+                </button>
+              }
+            </div>
+
+            <!-- Quick Snippet 1-Click Insert Buttons -->
+            <div class="space-y-1">
+              <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Quick Preset Snippets:</div>
+              <div class="flex flex-wrap gap-1.5">
+                @for (snip of quickSnippets; track snip.label) {
+                  <button
+                    type="button"
+                    class="px-2 py-1 text-[11px] font-semibold rounded bg-slate-100 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 border border-slate-200 text-slate-700 transition-all cursor-pointer flex items-center gap-1"
+                    (click)="insertSnippet(snip.code)"
+                    [title]="snip.description"
+                  >
+                    <span>⚡</span>
+                    <span>{{ snip.label }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- Style Tokens & Selectors Interactive Reference Guide Panel -->
+            @if (showTokenDocs()) {
+              <div class="p-3 bg-slate-900 text-slate-100 rounded-xl border border-slate-700 text-xs shadow-lg space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-sky-400">Exposed Style Token & Architecture Guide</span>
+                  </div>
+                  <!-- Tab Switcher -->
+                  <div class="inline-flex bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-[11px]">
+                    <button
+                      type="button"
+                      class="px-2.5 py-0.5 rounded font-semibold transition-all cursor-pointer"
+                      [ngClass]="activeDocTab() === 'tokens' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'"
+                      (click)="setDocTab('tokens')"
+                    >
+                      Variables (:root)
+                    </button>
+                    <button
+                      type="button"
+                      class="px-2.5 py-0.5 rounded font-semibold transition-all cursor-pointer"
+                      [ngClass]="activeDocTab() === 'selectors' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'"
+                      (click)="setDocTab('selectors')"
+                    >
+                      Selectors
+                    </button>
+                    <button
+                      type="button"
+                      class="px-2.5 py-0.5 rounded font-semibold transition-all cursor-pointer"
+                      [ngClass]="activeDocTab() === 'snippets' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'"
+                      (click)="setDocTab('snippets')"
+                    >
+                      Recipes
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Tab 1: Tokens -->
+                @if (activeDocTab() === 'tokens') {
+                  <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    <p class="text-[11px] text-slate-300 leading-relaxed">
+                      Override any root design token using <code class="bg-slate-800 text-sky-300 px-1 py-0.5 rounded">:root &#123; --token: value !important; &#125;</code>.
+                    </p>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-left text-[11px] border-collapse">
+                        <thead>
+                          <tr class="border-b border-slate-700 text-slate-400">
+                            <th class="py-1 pr-2 font-mono">Token Variable</th>
+                            <th class="py-1 pr-2">Category</th>
+                            <th class="py-1 pr-2">Affects / Description</th>
+                            <th class="py-1 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800">
+                          @for (t of styleTokens; track t.token) {
+                            <tr class="hover:bg-slate-800/50">
+                              <td class="py-1.5 pr-2 font-mono text-emerald-400 font-bold select-all">{{ t.token }}</td>
+                              <td class="py-1.5 pr-2">
+                                <span class="px-1.5 py-0.5 text-[9px] rounded bg-slate-800 text-slate-300 border border-slate-700">{{ t.category }}</span>
+                              </td>
+                              <td class="py-1.5 pr-2 text-slate-300">{{ t.description }}</td>
+                              <td class="py-1.5 text-right">
+                                <button
+                                  type="button"
+                                  class="text-[10px] font-bold text-sky-400 hover:text-sky-300 bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-600 cursor-pointer"
+                                  (click)="insertTokenSnippet(t.token, t.example)"
+                                  title="Insert into Custom CSS"
+                                >
+                                  + Insert
+                                </button>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                }
+
+                <!-- Tab 2: Selectors -->
+                @if (activeDocTab() === 'selectors') {
+                  <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    <p class="text-[11px] text-slate-300 leading-relaxed">
+                      Target specific component classes directly in custom CSS. Use <code class="bg-slate-800 text-sky-300 px-1 py-0.5 rounded">!important</code> to override template baseline styles.
+                    </p>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-left text-[11px] border-collapse">
+                        <thead>
+                          <tr class="border-b border-slate-700 text-slate-400">
+                            <th class="py-1 pr-2 font-mono">Selector</th>
+                            <th class="py-1 pr-2">Target Component</th>
+                            <th class="py-1 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800">
+                          @for (s of selectorDocs; track s.selector) {
+                            <tr class="hover:bg-slate-800/50">
+                              <td class="py-1.5 pr-2 font-mono text-amber-300 font-bold select-all">{{ s.selector }}</td>
+                              <td class="py-1.5 pr-2 text-slate-300">{{ s.description }}</td>
+                              <td class="py-1.5 text-right">
+                                <button
+                                  type="button"
+                                  class="text-[10px] font-bold text-sky-400 hover:text-sky-300 bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-600 cursor-pointer"
+                                  (click)="insertSelectorSnippet(s.selector, s.recommendedStyles)"
+                                  title="Insert skeleton into Custom CSS"
+                                >
+                                  + Insert
+                                </button>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                }
+
+                <!-- Tab 3: Recipes -->
+                @if (activeDocTab() === 'snippets') {
+                  <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    @for (snip of quickSnippets; track snip.label) {
+                      <div class="p-2 bg-slate-800/80 rounded-lg border border-slate-700 flex items-start justify-between gap-3">
+                        <div class="space-y-1">
+                          <div class="font-bold text-sky-300 text-xs">{{ snip.label }}</div>
+                          <div class="text-[10px] text-slate-400">{{ snip.description }}</div>
+                          <pre class="font-mono text-[10px] text-emerald-300 bg-slate-950 p-1.5 rounded overflow-x-auto">{{ snip.code }}</pre>
+                        </div>
+                        <button
+                          type="button"
+                          class="px-2 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded text-[10px] font-bold shrink-0 cursor-pointer"
+                          (click)="insertSnippet(snip.code)"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Textarea -->
+            <div class="space-y-1">
+              <textarea
+                rows="4"
+                placeholder=".section-title { letter-spacing: 1px; }&#10;.skill-pill { border-radius: 9999px !important; }"
+                class="w-full p-2.5 text-[11px] font-mono bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 resize-y text-slate-800 leading-normal"
+                [ngModel]="draftConfig().custom_css"
+                (ngModelChange)="updateField('custom_css', $event, 100)"
+              ></textarea>
+              <div class="flex items-center justify-between text-[10px] text-slate-400">
+                <span>Injected directly into document &bull; changes reflect live in preview.</span>
+                <span>Supports all valid CSS rules</span>
+              </div>
+            </div>
           </div>
         }
       </div>
@@ -331,11 +525,15 @@
       <!-- Iframe Display -->
       <div class="flex-1 p-3 bg-slate-200/90 overflow-auto flex justify-center items-start">
         @if (previewHtml()) {
-          <iframe
-            class="w-full h-full min-h-[600px] bg-white rounded-lg shadow-md border-0"
-            title="Live Template Preview"
-            [srcdoc]="previewHtml()"
-          ></iframe>
+          <div class="max-w-[850px] w-full mx-auto flex justify-center">
+            <iframe
+              (load)="onIframeLoad($event)"
+              class="w-full bg-transparent border-0"
+              style="min-height: 650px; width: 100%; transition: height 0.15s ease-out;"
+              title="Live Template Preview"
+              [srcdoc]="previewHtml()"
+            ></iframe>
+          </div>
         } @else {
           <div class="m-auto text-center py-20 text-slate-400">
             <div class="text-3xl mb-2">🎨</div>

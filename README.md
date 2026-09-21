@@ -131,6 +131,64 @@ The built-in audit engine ([backend/app/services/resume_score_checker.py](backen
 - Container uses `display: grid; grid-template-columns: 1.62fr 1fr;` to minimize page height.
 - Atomic `break-inside: avoid;` only on individual job items, ensuring pages split cleanly without orphaned headers or 30-page runaway gaps.
 - Screen badges (`.ats-banner`, diff highlights) are automatically hidden in print mode.
+- 1:1 screen preview synchronization matches physical PDF page layout, preventing text inflation or nested scrollbars.
+
+---
+
+## 🎨 Template Studio, Style Customizer & Design Tokens Guide
+
+The built-in **Template Studio** (`🎨 Styling` button in the preview toolbar) allows candidate documents to be dynamically customized with real-time reactive preview:
+
+### 1. Theming & Customization Controls
+- **Curated Color Palettes**: Sapphire Tech (`#0284c7`), Emerald Enterprise (`#059669`), Executive Slate (`#1e293b`), Royal Indigo (`#4338ca`), Crimson Modern (`#dc2626`), and Midnight Charcoal (`#09090b`), plus custom hex color pickers.
+- **Web Typography Engine**: Integrated Google Fonts preconnect with choices including **System Clean** (modern sans), **Inter** (clean Grotesk), **Merriweather** (executive serif), **JetBrains Mono** (technical/monospace), and **EB Garamond** (editorial serif).
+- **Page Density & Spacing**: Three discrete modes—`Compact` (28px 36px padding), `Standard` (34px 40px), and `Spacious` (54px 58px) with calibrated line spacing (`1.28` to `1.50`).
+- **Header Alignment Options**: `Left` aligned, `Center` stacked, or `Split` (name on left, contact items on right).
+- **Section Visibility Toggles**: Granular toggles for tagline, contact icons, projects, certifications, and education.
+
+### 2. Exposed CSS Design Tokens (`:root`)
+Users can override any design token inside the **Custom CSS** editor:
+
+| Token Variable | Category | Description & Purpose | Default / Example |
+|---|---|---|---|
+| `--primary-color` | Colors | Candidate name, section underlines, primary badges, headings | `#0284c7` |
+| `--accent-color` | Colors | Company names, links, icons, job titles, secondary emphasis | `#0284c7` |
+| `--text-primary` | Colors | Main paragraph text, summary statement, and bullet points | `#1e293b` |
+| `--text-muted` | Colors | Dates, locations, institution names, and subtle metadata | `#64748b` |
+| `--font-family` | Typography | Global font stack for body, headings, and lists | `system-ui`, `Inter`, `Merriweather` |
+| `--font-size` | Typography | Base body text size (10.5px to 13px; calibrated for 1-2 page budget) | `11.5px` (~8.6pt) |
+| `--line-height` | Typography | Vertical rhythm and paragraph line height ratio | `1.36` |
+| `--border-color` | Structure | Light card borders and subtle dividers | `#cbd5e1` |
+| `--divider-subtle` | Structure | Separators between experience items | `#f1f5f9` |
+| `--diff-bg` | Diff / Badges | Background tint for tailored modifications in diff mode | `#f0fdf4` |
+| `--diff-border` | Diff / Badges | Left accent border for modified bullet points | `#16a34a` |
+
+### 3. Key Component Selectors
+- `.resume-paper`: The printable document paper container sheet.
+- `.header`: Top banner containing applicant name, title, and contact items.
+- `.name`, `h1`: Candidate's full name.
+- `.title-tagline`: Professional title and positioning tagline.
+- `.section-title`: Main section headers (EXPERIENCE, SKILLS, etc.).
+- `.exp-role`: Job position / title in experience entries.
+- `.exp-company`: Employer / company name in experience entries.
+- `.exp-meta`: Date range and location line.
+- `.exp-highlights li`: Individual achievement bullet points.
+- `.skill-pill`: Individual technical competency badge.
+- `.skill-pill.matched`: Highlighted skill badge matching target job spec keywords.
+- `.ats-banner`: Top ATS compliance verification badge.
+
+### 4. Interactive 1-Click Quick Snippets
+Template Studio provides instant one-click presets for common customizations:
+- **Rounded Pill Badges**: Applies full pill border-radius and crisp border.
+- **Left Accent Bar**: Converts section underlines into a modern vertical accent bar.
+- **Underlined Roles**: Underlines job titles in accent color with text-underline offset.
+- **Compact Bullets**: Tightens vertical margins to optimize content budget.
+- **Hide ATS Banner**: Hides the top verification banner for a minimalist look.
+
+### 5. Template Config API Endpoints
+- `GET /api/template/config`: Retrieves currently persisted template configuration.
+- `PUT /api/template/config`: Updates and persists custom colors, fonts, density, and CSS.
+- `POST /api/template/config/reset`: Resets configuration back to system defaults.
 
 ---
 

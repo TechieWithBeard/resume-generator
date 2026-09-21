@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, inject } from '@angular/core';
+import { Component, ElementRef, ViewChild, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ResumeGeneratorService } from '../../services/resume-generator.service';
 import { CardComponent } from '../../shared/components/card/card.component';
@@ -15,6 +15,8 @@ export class ResumePreviewComponent {
   private readonly resumeService = inject(ResumeGeneratorService);
 
   @ViewChild('resumeIframe') resumeIframe?: ElementRef<HTMLIFrameElement>;
+  @ViewChild('baseResumeIframe') baseResumeIframe?: ElementRef<HTMLIFrameElement>;
+  @ViewChild('tailoredResumeIframe') tailoredResumeIframe?: ElementRef<HTMLIFrameElement>;
 
   readonly renderedHtml = this.resumeService.renderedHtml;
   readonly baseRenderedHtml = this.resumeService.baseRenderedHtml;
@@ -28,6 +30,45 @@ export class ResumePreviewComponent {
   readonly auditReport = this.resumeService.auditReport;
   readonly baseResume = this.resumeService.baseResume;
   readonly tailoredResume = this.resumeService.tailoredResume;
+
+  constructor() {
+    effect(() => {
+      // Re-adjust iframe height when renderedHtml changes
+      const _ = this.renderedHtml();
+      setTimeout(() => {
+        this.adjustIframeHeight(this.resumeIframe?.nativeElement);
+        this.adjustIframeHeight(this.tailoredResumeIframe?.nativeElement);
+      }, 50);
+    });
+
+    effect(() => {
+      const _ = this.baseRenderedHtml();
+      setTimeout(() => {
+        this.adjustIframeHeight(this.baseResumeIframe?.nativeElement);
+      }, 50);
+    });
+  }
+
+  onIframeLoad(event: Event): void {
+    const iframe = event.target as HTMLIFrameElement;
+    this.adjustIframeHeight(iframe);
+  }
+
+  adjustIframeHeight(iframe?: HTMLIFrameElement | null): void {
+    if (!iframe) return;
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc && doc.body) {
+        doc.body.style.overflow = 'hidden';
+        const height = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
+        if (height > 0) {
+          iframe.style.height = `${height + 24}px`;
+        }
+      }
+    } catch {
+      iframe.style.height = '1100px';
+    }
+  }
 
   onSelectTemplate(tmplId: string): void {
     this.resumeService.selectTemplate(tmplId);

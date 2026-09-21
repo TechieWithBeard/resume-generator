@@ -110,11 +110,11 @@ class AlignmentReport(BaseModel):
 class TemplateConfig(BaseModel):
     template_id: str = "modern"
     primary_color: str = "#0284c7"
-    accent_color: str = "#0369a1"
-    text_color: str = "#0f172a"
+    accent_color: str = "#0284c7"
+    text_color: str = "#1e293b"
     font_family: str = "system-ui, -apple-system, sans-serif"
-    font_size: str = "14px"
-    line_height: str = "1.5"
+    font_size: str = "11.5px"
+    line_height: str = "1.36"
     density: Literal["compact", "normal", "comfortable"] = "normal"
     header_layout: Literal["left", "center", "split"] = "left"
     show_tagline: bool = True
