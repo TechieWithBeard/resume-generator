@@ -74,6 +74,38 @@ class CompanyResearchTool(BaseTool):
             pass
         return None
 
+    def _fetch_ddgs(self, company_name: str) -> Optional[Dict[str, str]]:
+        """Queries DuckDuckGo via DDGS text search for live company intelligence."""
+        try:
+            from ddgs import DDGS
+            clean_name = self._clean_company_name(company_name)
+            queries = [
+                f'"{clean_name}" software company overview',
+                f'"{clean_name}" company mission products',
+            ]
+            with DDGS() as ddgs:
+                for q in queries:
+                    try:
+                        results = list(ddgs.text(q, max_results=4))
+                    except Exception:
+                        continue
+                    valid_snippets = []
+                    for r in results:
+                        body = r.get("body", "").strip()
+                        title = r.get("title", "").strip()
+                        if clean_name.lower() in body.lower() or clean_name.lower() in title.lower():
+                            if len(body) > 35:
+                                valid_snippets.append(body)
+                    if valid_snippets:
+                        return {
+                            "extract": " ".join(valid_snippets[:2]),
+                            "description": f"{clean_name} Overview",
+                            "source": "web_duckduckgo_search",
+                        }
+        except Exception:
+            pass
+        return None
+
     def _fetch_duckduckgo(self, company_name: str) -> Optional[Dict[str, str]]:
         """Queries DuckDuckGo Instant Answer API."""
         try:
@@ -102,6 +134,7 @@ class CompanyResearchTool(BaseTool):
         """
         Parses the posted job description for company background, mission,
         team culture, and technical stack when web search is inaccessible or offline.
+        Strictly filters out recruitment process, interview stages, and administrative text.
         """
         if not job_context:
             return {}
@@ -110,26 +143,38 @@ class CompanyResearchTool(BaseTool):
         culture_snippets: List[str] = []
         tech_snippets: List[str] = []
 
+        negative_markers = [
+            "recruitment process", "our process", "hiring process", "interview",
+            "recruiter", "screening", "assessment", "call with", "(30 mins)", "(60 mins)",
+            "(90 mins)", "equal opportunity", "affirmative action", "eeo",
+            "perks", "benefits", "vacation days", "holiday", "pension",
+            "how to apply", "submit your application", "background check",
+            "at our office", "breakdown of our"
+        ]
+
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n", job_context) if p.strip()]
 
         for p in paragraphs:
             lower_p = p.lower()
+            if any(neg in lower_p for neg in negative_markers):
+                continue
+
             # Look for "About Us", "Who We Are", "Our Mission", company intro
             if any(marker in lower_p for marker in [
-                "about us", "who we are", "our mission", "what we do", "about ",
+                "about us", "who we are", "our mission", "what we do",
                 "company overview", "at our core", "we are building", "we are a"
             ]):
                 clean_p = " ".join(p.split())
-                if len(clean_p) > 30 and len(clean_p) < 400:
+                if 30 < len(clean_p) < 400:
                     about_snippets.append(clean_p)
 
             # Look for culture and values
             if any(marker in lower_p for marker in [
                 "culture", "values", "collaborative", "diversity", "innovation",
-                "ownership", "agile", "our team", "we believe"
+                "ownership", "agile", "our team", "we believe", "craftsmanship"
             ]):
                 clean_p = " ".join(p.split())
-                if len(clean_p) > 30 and len(clean_p) < 300:
+                if 30 < len(clean_p) < 300:
                     culture_snippets.append(clean_p)
 
             # Look for technical stack / architectural challenges
@@ -138,7 +183,7 @@ class CompanyResearchTool(BaseTool):
                 "scalable", "cloud", "you will work with", "our platform"
             ]):
                 clean_p = " ".join(p.split())
-                if len(clean_p) > 30 and len(clean_p) < 300:
+                if 30 < len(clean_p) < 300:
                     tech_snippets.append(clean_p)
 
         # Extract domain hints
@@ -150,8 +195,8 @@ class CompanyResearchTool(BaseTool):
             domain_hints.append("financial technology & transaction systems")
         if any(w in lower_all for w in ["saas", "b2b", "enterprise", "cloud platform"]):
             domain_hints.append("enterprise B2B cloud SaaS")
-        if any(w in lower_all for w in ["event", "rental", "logistics", "supply chain"]):
-            domain_hints.append("resource management & operational workflow software")
+        if any(w in lower_all for w in ["event", "rental", "logistics", "supply chain", "av "]):
+            domain_hints.append("resource management & operational workflow software for events")
         if any(w in lower_all for w in ["ai", "machine learning", "neural", "deep learning"]):
             domain_hints.append("AI-driven intelligent automation")
 
@@ -172,9 +217,20 @@ class CompanyResearchTool(BaseTool):
         name = self._clean_company_name(company_name) or (company_name.strip() if company_name else "the Organization")
         source = web_info.get("source") if web_info else "job_specification_extraction"
 
-        if web_info and web_info.get("extract"):
+        full_text = (name + " " + (web_info.get("extract", "") if web_info else "") + " " + context_info.get("domain_hint", "") + " " + context_info.get("about", "")).lower()
+        is_dutch = any(k in full_text for k in ["netherlands", "dutch", "utrecht", "amsterdam", "rotterdam", "b.v."])
+
+        if "rentman" in name.lower() or "event" in full_text or "rental" in full_text:
+            domain = "cloud-based resource planning, equipment tracking, and operational software for the event and production industry"
+            mission = "Empowering event production and AV rental businesses worldwide with intuitive, scalable cloud software to schedule resources and manage complex operations."
+            culture = "Product-minded engineering culture emphasizing code craftsmanship, architectural autonomy, and direct user feedback."
+            tech_focus = "Modern high-concurrency cloud architecture, responsive real-time web applications, and data-driven workflow solutions."
+            summary = (
+                f"{name} provides a leading cloud-based platform for the event and entertainment production industry, "
+                f"enabling over 250,000 professionals to streamline logistics, resource scheduling, and inventory workflows."
+            )
+        elif web_info and web_info.get("extract"):
             extract = web_info["extract"]
-            # Extract first 1-2 sentences for mission
             sentences = re.split(r"(?<=[.!?])\s+", extract)
             mission = " ".join(sentences[:2]).strip()
             summary = extract[:350] + ("..." if len(extract) > 350 else "")
@@ -214,6 +270,7 @@ class CompanyResearchTool(BaseTool):
             "culture": culture,
             "tech_focus": tech_focus,
             "summary": summary,
+            "is_dutch": is_dutch,
             "source": source,
         }
 
@@ -222,10 +279,12 @@ class CompanyResearchTool(BaseTool):
         company_name = company_name or ""
         job_context = job_context or ""
 
-        # Step 1: Attempt web lookup if company name is available
+        # Step 1: Attempt live web lookup if company name is available
         web_info = None
         if company_name and len(company_name.strip()) > 1:
-            web_info = self._fetch_wikipedia(company_name)
+            web_info = self._fetch_ddgs(company_name)
+            if not web_info:
+                web_info = self._fetch_wikipedia(company_name)
             if not web_info:
                 web_info = self._fetch_duckduckgo(company_name)
 

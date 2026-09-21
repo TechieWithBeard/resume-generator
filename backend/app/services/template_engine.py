@@ -1178,40 +1178,18 @@ class TemplateEngine:
             target_str += f" &bull; <span class='target-company'>{target_company}</span>"
         target_banner_html = f"""
         <div class="cv-target-banner avoid-break">
-            <span class="target-badge">🎯 TARGET ROLE ALIGNMENT</span>
+            <span class="target-badge">TARGET ROLE ALIGNMENT</span>
             <span class="target-details">{target_str}</span>
             {diff_pill_target}
         </div>
         """
 
-        # Researched Intelligence Callout
-        research = getattr(resume, "company_research", None)
-        research_html = ""
-        if research and isinstance(research, dict):
-            r_mission = research.get("mission") or ""
-            r_culture = research.get("culture") or ""
-            r_tech = research.get("tech_focus") or ""
-            r_source = "DuckDuckGo & Wikipedia Live Intelligence" if "web" in str(research.get("source", "")) else "Job Specification Intelligence Extraction"
-            research_html = f"""
-            <div class="cv-intel-box avoid-break">
-                <div class="intel-header">
-                    <span class="intel-badge">🌐 LANGCHAIN COMPANY RESEARCH DOSSIER</span>
-                    <span class="intel-source">{r_source}</span>
-                </div>
-                <div class="intel-body">
-                    {f'<div class="intel-item"><strong>Mission & Domain:</strong> {r_mission}</div>' if r_mission else ''}
-                    {f'<div class="intel-item"><strong>Engineering Culture:</strong> {r_culture}</div>' if r_culture else ''}
-                    {f'<div class="intel-item"><strong>Technical Focus:</strong> {r_tech}</div>' if r_tech else ''}
-                </div>
-            </div>
-            """
-
-        # Section 1: Why Company? (1 cohesive, inspiring paragraph)
+        # Section 1: Why Company? (1-2 cohesive, inspiring paragraphs)
         why_company_raw = getattr(resume, "why_company", None)
         if not why_company_raw:
             why_company_raw = (
-                f"I am strongly drawn to {target_company} because of your commitment to pioneering breakthrough, "
-                f"mission-critical digital platforms and your culture of engineering excellence and architectural autonomy. "
+                f"{target_company}'s mission to transform scalable software solutions and your culture of "
+                f"engineering excellence and architectural autonomy resonate strongly with my professional philosophy. "
                 f"As a Senior Frontend Architect who thrives on solving complex challenges at scale, I am energized by {target_company}'s "
                 f"focus on building high-reliability platforms. Joining your organization represents an exceptional opportunity to contribute "
                 f"to transformative products while collaborating with a world-class engineering team."
@@ -1223,8 +1201,10 @@ class TemplateEngine:
             else why_company_raw
         )
         why_comp_badge = f'<div class="diff-box-badge"><span class="diff-chip added">+ Tailored Profile</span> <span class="diff-note" style="font-size:7.5pt; color:#15803d; font-weight:600;">Aligned for {target_company}</span></div>' if highlight_diff else ""
+        why_comp_paras = [p.strip() for p in rendered_why_company.split("\n\n") if p.strip()]
+        why_comp_html = "".join([f'<p class="letter-text">{p}</p>' for p in why_comp_paras])
 
-        # Section 2: Why I am the Ideal Fit for Role? (1 impactful paragraph)
+        # Section 2: Why I am the Ideal Fit for Role? (1-2 impactful paragraphs)
         why_fit_raw = getattr(resume, "why_fit", None)
         if not why_fit_raw:
             why_fit_raw = (
@@ -1243,6 +1223,8 @@ class TemplateEngine:
             else why_fit_raw
         )
         why_fit_badge = f'<div class="diff-box-badge"><span class="diff-chip added">+ Tailored Profile</span> <span class="diff-note" style="font-size:7.5pt; color:#15803d; font-weight:600;">Positioned for {target_role}</span></div>' if highlight_diff else ""
+        why_fit_paras = [p.strip() for p in rendered_why_fit.split("\n\n") if p.strip()]
+        why_fit_html = "".join([f'<p class="letter-text">{p}</p>' for p in why_fit_paras])
 
         # Section 3: Scope & Leadership Highlights from Experience
         scope_callouts = []
@@ -1256,9 +1238,9 @@ class TemplateEngine:
                     if highlight_diff
                     else scope_text
                 )
-                scope_tag = '<span class="scope-tag">⚡ SCOPE &amp; LEADERSHIP:</span>'
+                scope_tag = '<span class="scope-tag">SCOPE &amp; LEADERSHIP:</span>'
                 if highlight_diff:
-                    scope_tag = '<span class="scope-tag">⚡ SCOPE &amp; LEADERSHIP:</span> <span class="diff-pill scope">+ Role Scope Enriched</span>'
+                    scope_tag = '<span class="scope-tag">SCOPE &amp; LEADERSHIP:</span> <span class="diff-pill scope">+ Role Scope Enriched</span>'
 
                 env_pills = ""
                 if getattr(exp, "technologies", None):
@@ -1347,7 +1329,7 @@ class TemplateEngine:
             <div class="cv-cert-item avoid-break">
                 <div class="entry-header">
                     <div>
-                        <span class="entry-title">🏆 {c.name}</span>
+                        <span class="entry-title">{c.name}</span>
                         {f'<span class="entry-sep">|</span> {c_issuer}' if c_issuer else ''}
                         {f'<span class="entry-sep">|</span> {c_cred}' if c_cred else ''}
                     </div>
@@ -1363,7 +1345,7 @@ class TemplateEngine:
             <div class="cv-edu-item avoid-break">
                 <div class="entry-header">
                     <div>
-                        <span class="entry-title">🎓 {edu.degree}</span>
+                        <span class="entry-title">{edu.degree}</span>
                         <span class="entry-sep">|</span>
                         <span class="entry-subtitle">{edu.institution}</span>
                     </div>
@@ -1403,7 +1385,6 @@ class TemplateEngine:
         if has_european_exp:
             european_spotlight_html = """
             <div class="cv-european-banner avoid-break">
-                <div class="eu-flag-box">🇪🇺</div>
                 <div class="eu-content">
                     <strong>European Enterprise &amp; International Delivery:</strong>
                     Proven engineering track record delivering scalable web platforms for European clients, including Dutch enterprise organization Maistering B.V. (Netherlands) and AVEVA.
@@ -1449,44 +1430,25 @@ class TemplateEngine:
     border-radius: 4px;
     border-top: 4px solid var(--accent-color);
   }}
-  .cv-top-bar {{
+  .header-top-row {{
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 8px;
-    margin-bottom: 16px;
+    align-items: baseline;
+    margin-bottom: 4px;
   }}
-  .cv-badge-group {{
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }}
-  .cv-badge {{
-    display: inline-block;
-    background: #1e3a8a;
-    color: #ffffff;
-    font-size: 7.5pt;
+  .header-doc-type {{
+    font-size: 8pt;
     font-weight: 700;
-    letter-spacing: 1.2px;
+    color: var(--accent-color);
+    letter-spacing: 1.5px;
     text-transform: uppercase;
+    background: #e0e7ff;
     padding: 3px 8px;
     border-radius: 3px;
   }}
-  .cv-badge.secondary {{
-    background: #e0e7ff;
-    color: #1e3a8a;
-  }}
-  .cv-meta-confidential {{
-    font-size: 7.5pt;
-    font-weight: 600;
-    color: var(--text-muted);
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-  }}
   .header {{
     text-align: left;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
   }}
   .name {{
     font-size: 24pt;
@@ -1494,12 +1456,12 @@ class TemplateEngine:
     color: var(--primary-color);
     letter-spacing: -0.5px;
     line-height: 1.15;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }}
   .title-tagline {{
-    font-size: 12pt;
+    font-size: 11pt;
     font-weight: 600;
-    color: var(--accent-color);
+    color: #475569;
     margin-bottom: 8px;
   }}
   .contacts {{
@@ -2129,19 +2091,14 @@ class TemplateEngine:
 <body>
 <div class="resume-paper paper">
   {diff_legend_html}
-  <div class="cv-top-bar">
-    <div class="cv-badge-group">
-      <span class="cv-badge">Curriculum Vitae</span>
-      <span class="cv-badge secondary">Statement of Strategic Alignment</span>
+  <header class="header">
+    <div class="header-top-row">
+      <h1 class="name">{resume.name}</h1>
+      <span class="header-doc-type">Curriculum Vitae</span>
     </div>
-    <span class="cv-meta-confidential">Verified Dossier &bull; Zero-Hallucination</span>
-  </div>
-
-  <div class="header">
-    <h1 class="name">{resume.name}</h1>
     <div class="title-tagline">{resume.title}{f" • {resume.tagline}" if (config is None or config.show_tagline) and resume.tagline else ""}</div>
     <div class="contacts">{contact_html}</div>
-  </div>
+  </header>
 
   <div class="cv-addressee-block avoid-break">
     <div class="addressee-left">
@@ -2151,38 +2108,36 @@ class TemplateEngine:
     </div>
     <div class="addressee-right">
       <div class="subject-line"><strong>RE:</strong> Application for <span class="subject-role">{target_role}</span></div>
-      <div class="subject-sub">Curriculum Vitae &amp; Statement of Strategic Alignment</div>
+      <div class="subject-sub">Statement of Strategic Alignment</div>
     </div>
   </div>
 
   {target_banner_html}
 
-  {research_html}
-
   <div class="cv-section section avoid-break">
-    <div class="section-title">01 / Motivation &amp; Strategic Alignment — Why {target_company}?</div>
+    <div class="section-title">Strategic Motivation &amp; Alignment — Why {target_company}?</div>
     <div class="cv-letter-box">
       {why_comp_badge}
-      <p class="letter-text">{rendered_why_company}</p>
+      {why_comp_html}
     </div>
   </div>
 
   <div class="cv-section section avoid-break">
-    <div class="section-title">02 / Candidate Value Proposition — Why I am the Ideal Fit for {target_role}?</div>
+    <div class="section-title">Executive Value Proposition — Fit for {target_role}</div>
     <div class="cv-letter-box">
       {why_fit_badge}
-      <p class="letter-text">{rendered_why_fit}</p>
+      {why_fit_html}
     </div>
   </div>
 
   <div class="cv-section section">
-    <div class="section-title">03 / Key Strategic Competencies &amp; Architectural Wins</div>
+    <div class="section-title">Key Strategic Competencies &amp; Architectural Wins</div>
     {''.join(scope_callouts)}
     {''.join(project_callouts) if (config is None or config.show_projects) else ''}
   </div>
 
   <div class="cv-section section avoid-break">
-    <div class="section-title">04 / Verified Credentials &amp; Academic Foundation</div>
+    <div class="section-title">Verified Credentials &amp; Academic Foundation</div>
     {f'<div class="competency-grid">{skill_cards}</div>' if skill_cards else ''}
     {''.join(cert_items) if (config is None or config.show_certifications) and cert_items else ''}
     {''.join(edu_items) if (config is None or config.show_education) and edu_items else ''}
@@ -2198,7 +2153,7 @@ class TemplateEngine:
 
   <footer class="cv-footer avoid-break">
     <span>Curriculum Vitae &bull; {resume.name}</span>
-    <span>Verified Technical Dossier &bull; Generated for {target_company}</span>
+    <span>Tailored Application &bull; {target_company}</span>
   </footer>
 </div>
 </body>

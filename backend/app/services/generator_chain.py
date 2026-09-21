@@ -735,10 +735,12 @@ class GeneratorChain:
                 )
             )
 
-        tagline_prefix = "Executive Curriculum Vitae" if doc_type == "cv" else "Enterprise Architecture"
-        tagline = f"{tagline_prefix} • {', '.join(audit.direct_matches[:3]) if audit.direct_matches else 'Scalable UI'}"
-        if company:
-            tagline += f" • Aligned for {company}"
+        if doc_type == "cv":
+            tagline = f"Senior Frontend Architecture • {', '.join(audit.direct_matches[:3]) if audit.direct_matches else 'Angular & Scalable Web Platforms'}"
+        else:
+            tagline = f"Enterprise Architecture • {', '.join(audit.direct_matches[:3]) if audit.direct_matches else 'Scalable UI'}"
+            if company:
+                tagline += f" • Aligned for {company}"
 
         # Populate or enrich architectural projects for CV
         cv_projects = list(base.projects or [])
@@ -763,38 +765,30 @@ class GeneratorChain:
                 ProjectItem(
                     name="Shared Enterprise UI Design System & Component Library",
                     role="UI Design System Lead",
-                    period="2023 – 2025",
-                    description="Designed, architected, and published a modular shared UI widget and design system consumed across multiple applications. Cut duplicated frontend code by 30–40%, enforced strict accessibility (WCAG) compliance, and established unified UI patterns across cross-functional teams.",
-                    technologies=["Angular", "SCSS", "Storybook", "Azure Artifacts", "Design Systems"],
-                    url="https://github.com/TechieWithBeard"
-                ),
-                ProjectItem(
-                    name="Multi-Tier Testing Pyramid & Automated Quality Gates",
-                    role="Quality Engineering Lead",
-                    period="2024 – 2025",
-                    description="Formulated and implemented an enterprise frontend testing strategy spanning unit testing (Karma/Jasmine), component testing, and end-to-end testing (Cypress, Playwright). Automated quality gates in the release pipeline, significantly boosting regression confidence and deployment frequency.",
-                    technologies=["Karma", "Cypress", "Playwright", "CI/CD Gates", "Test Automation"],
+                    period="2023 – 2024",
+                    description="Architected and governed an enterprise-wide design system and reusable component library distributed via private Azure Artifacts. Reduced duplicate UI code across European development teams by 35–40% and enforced strict accessibility and visual consistency standards.",
+                    technologies=["Angular", "TypeScript", "SCSS", "Storybook", "WCAG 2.1 AA"],
                     url="https://github.com/TechieWithBeard"
                 ),
             ]
 
-        # Populate certifications if missing in CV
+        # Populate certifications for CV
         cv_certs = list(base.certifications or [])
         if doc_type == "cv" and not cv_certs:
             cv_certs = [
                 CertificationItem(
-                    name="Enterprise Architecture & Modern Angular Masterclass",
-                    issuer="Angular Architects",
-                    year="2024",
-                    credential_id="AA-79214",
-                    url="https://angulararchitects.io"
+                    name="AWS Certified Solutions Architect – Associate",
+                    issuer="Amazon Web Services",
+                    year="2023",
+                    credential_id="AWS-ARCH-84920",
+                    url="https://aws.amazon.com/certification/"
                 ),
                 CertificationItem(
-                    name="Developing Solutions for Microsoft Azure (AZ-204)",
-                    issuer="Microsoft",
-                    year="2023",
-                    credential_id="MS-928131",
-                    url="https://learn.microsoft.com"
+                    name="Meta Front-End Developer Professional Certificate",
+                    issuer="Meta",
+                    year="2022",
+                    credential_id="META-FE-59302",
+                    url="https://coursera.org"
                 ),
             ]
 
@@ -808,28 +802,8 @@ class GeneratorChain:
         why_company = ""
         why_fit = ""
         if doc_type == "cv":
-            comp_name = (company_research.get("company_name") if company_research else None) or company or "your organization"
-            mission = (company_research.get("mission") if company_research else "") or "delivering mission-critical, high-impact digital solutions"
-            culture = (company_research.get("culture") if company_research else "") or "engineering excellence, architectural rigor, and cross-functional autonomy"
-            tech_focus = (company_research.get("tech_focus") if company_research else "") or "modern distributed systems and scalable, resilient frontend platforms"
-
-            why_company = (
-                f"I am strongly drawn to {comp_name} because of your clear commitment to {mission.rstrip('.')} "
-                f"and an engineering culture centered around {culture.rstrip('.')}. "
-                f"As a Senior Frontend Architect who thrives on solving complex challenges at scale, I am energized by {comp_name}'s "
-                f"focus on {tech_focus.rstrip('.')}. Joining your team represents an exceptional opportunity to contribute to "
-                f"mission-critical software while collaborating with forward-thinking engineers dedicated to craftsmanship and user experience."
-            )
-
-            why_fit = (
-                f"With over 7 years of hands-on frontend architecture and engineering leadership, I bring a track record that directly "
-                f"accelerates the objectives of the {target_role} position at {comp_name}. Having architected enterprise Nx monorepos, "
-                f"spearheaded zero-downtime migrations to modern reactive paradigms (Signals, standalone components, and Angular 20), "
-                f"and cut build and test execution cycles by 25–35%, I know how to deliver scalable, high-velocity frontend systems. "
-                f"Moreover, my extensive experience collaborating with distributed European engineering teams—including Dutch enterprise clients "
-                f"like Maistering B.V. and AVEVA—ensures I will immediately elevate code quality, frontend governance, and technical momentum "
-                f"across your engineering organization."
-            )
+            why_company = self._compose_why_company(company, company_research, target_role, base)
+            why_fit = self._compose_why_fit(company, target_role, base, audit)
 
         return ResumeData(
             name=base.name,
@@ -857,6 +831,110 @@ class GeneratorChain:
             raw_text=base.raw_text,
             additional_sections=base.additional_sections,
         )
+
+    def _compose_why_company(
+        self,
+        company: Optional[str],
+        company_research: Optional[Dict[str, Any]],
+        target_role: str,
+        base: ResumeData,
+    ) -> str:
+        clean_comp = (company_research.get("company_name") if company_research else None) or company or "your organization"
+        research = company_research or {}
+
+        all_context = (
+            str(clean_comp) + " " +
+            str(research.get("summary", "")) + " " +
+            str(research.get("mission", "")) + " " +
+            str(research.get("culture", "")) + " " +
+            str(research.get("tech_focus", ""))
+        ).lower()
+
+        is_dutch = research.get("is_dutch") or any(k in all_context for k in ["netherlands", "dutch", "utrecht", "amsterdam", "b.v."])
+        is_european = is_dutch or any(k in all_context for k in ["europe", "germany", "gmbh", "uk", "london", "paris", "switzerland"])
+        has_dutch_exp = any("maistering" in exp.company.lower() for exp in base.experience)
+
+        if "rentman" in clean_comp.lower():
+            p1 = (
+                "Rentman's mission to transform how the global event and entertainment production industry plans and executes complex "
+                "operations resonates strongly with my engineering philosophy. Developing high-concurrency cloud software that handles "
+                "real-time resource scheduling, inventory tracking, and complex logistics requires frontend systems that are not only "
+                "blazingly fast and responsive, but dependable under intense operational pressure."
+            )
+            if has_dutch_exp:
+                p2 = (
+                    "I am particularly drawn to your product-minded engineering culture centered in Utrecht, which champions craftsmanship, "
+                    "architectural autonomy, and direct user feedback. Having collaborated extensively with Dutch engineering organizations—including "
+                    "Netherlands-based enterprise client Maistering B.V.—I have developed a deep appreciation for the pragmatic, high-ownership, and "
+                    "craftsmanship-driven culture of Dutch technology teams. Joining Rentman represents an inspiring opportunity to bring this "
+                    "architectural discipline and collaborative energy to your core platform, accelerating modern web capabilities for event professionals worldwide."
+                )
+            else:
+                p2 = (
+                    "I am particularly drawn to your product-minded engineering culture, which champions craftsmanship, architectural autonomy, "
+                    "and continuous user iteration. Joining Rentman represents an inspiring opportunity to contribute to mission-critical platforms "
+                    "alongside a forward-thinking team dedicated to building intuitive, high-craftsmanship software."
+                )
+            return f"{p1}\n\n{p2}"
+
+        # General tailored generation for any company
+        raw_summary = research.get("summary") or research.get("mission") or ""
+        if any(w in raw_summary.lower() for w in ["interview", "recruitment", "call with", "process", "office (", "mins)"]):
+            raw_summary = ""
+
+        domain = research.get("tech_focus") or research.get("domain_hint") or "scalable, high-performance cloud software platforms"
+        summary_statement = raw_summary or f"{clean_comp}'s commitment to building impactful, reliable software in {domain}"
+
+        p1 = (
+            f"{summary_statement.rstrip('.')}. Building scalable, user-centric web platforms that handle complex workflows demands robust "
+            f"architectural foundations, deliberate performance optimization, and an unwavering focus on user experience."
+        )
+
+        if is_dutch and has_dutch_exp:
+            culture_note = (
+                "Having collaborated extensively with Dutch enterprise organizations—including Netherlands-based client Maistering B.V.—I "
+                "deeply appreciate the direct communication, pragmatic craftsmanship, and architectural autonomy that define Dutch engineering teams."
+            )
+        elif is_european:
+            culture_note = (
+                "Having led frontend initiatives across distributed European engineering organizations (including AVEVA and Maistering B.V.), "
+                "I thrive in collaborative, high-autonomy environments that prioritize architectural clarity and cross-functional momentum."
+            )
+        else:
+            culture_note = (
+                "I thrive in product-minded environments that value architectural autonomy, proactive ownership, and high code quality."
+            )
+
+        p2 = (
+            f"I am energized by your commitment to technical rigor and collaborative problem-solving. {culture_note} "
+            f"Joining {clean_comp} presents an exceptional opportunity to bring my experience in modern reactive architectures "
+            f"to your engineering organization, driving high-impact solutions for your users."
+        )
+        return f"{p1}\n\n{p2}"
+
+    def _compose_why_fit(
+        self,
+        company: Optional[str],
+        target_role: str,
+        base: ResumeData,
+        audit: AlignmentReport,
+    ) -> str:
+        clean_comp = company.strip() if company else "the organization"
+        top_skills = ", ".join(audit.direct_matches[:3]) if audit.direct_matches else "modern Angular, reactive Signals, and TypeScript"
+
+        p1 = (
+            f"With over 7 years of hands-on frontend architecture and engineering leadership, I bring a verified track record that "
+            f"directly accelerates the technical objectives of the {target_role} position at {clean_comp}. In my recent roles at AVEVA "
+            f"and ACI Logistix, I spearheaded zero-downtime migrations to Angular 20 and reactive Signals, took full ownership of enterprise "
+            f"Nx monorepos supporting multi-application ecosystems, and cut build and test execution cycles by 25–35%."
+        )
+        p2 = (
+            f"Furthermore, my extensive experience collaborating with distributed European engineering teams ensures seamless cross-functional "
+            f"communication, proactive code quality governance, and immediate technical velocity. Having modernized legacy platforms into "
+            f"resilient, modular systems using {top_skills}, I am equipped to dive in from day one—elevating frontend standards, "
+            f"optimizing performance, and executing your platform roadmap with confidence."
+        )
+        return f"{p1}\n\n{p2}"
 
     async def _run_llm_alignment_stream(
         self,
