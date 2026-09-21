@@ -19,6 +19,7 @@ from backend.app.models.resume import (
     ExperienceItem,
     JobInput,
     LLMConfig,
+    PreflightReport,
     ResumeData,
 )
 from backend.app.services.template_engine import template_engine
@@ -48,7 +49,8 @@ class GeneratorChain:
                         if m.startswith(f"{requested}:") or requested in m:
                             return m
                 # Default preference list
-                for pref in ["llama3.1:8b", "llama3.1", "llama3:latest", "phi3:latest", "phi3", "gemma4", "gemma"]:
+                env_model = os.getenv("OLLAMA_MODEL", "llama3.2")
+                for pref in [env_model, "llama3.2", "llama3.2:3b", "llama3.1:8b", "llama3.1", "llama3:latest", "phi3:latest", "phi3"]:
                     for m in models:
                         if pref in m:
                             return m
@@ -60,7 +62,7 @@ class GeneratorChain:
                     return models[0]
         except Exception:
             pass
-        return requested or "llama3.1:8b"
+        return requested or os.getenv("OLLAMA_MODEL", "llama3.2")
 
     def _get_llm(self, config: LLMConfig):
         """Initializes appropriate LangChain chat model based on configuration."""
@@ -91,7 +93,7 @@ class GeneratorChain:
             try:
                 from langchain_ollama import ChatOllama
                 base_url = config.base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-                model_name = self._resolve_ollama_model(base_url, config.model_name)
+                model_name = self._resolve_ollama_model(base_url, config.model_name or os.getenv("OLLAMA_MODEL"))
                 return ChatOllama(
                     model=model_name,
                     base_url=base_url,
@@ -323,6 +325,18 @@ class GeneratorChain:
                 await asyncio.sleep(0.02)
             await asyncio.sleep(0.06)
 
+        guidance = job_input.human_guidance or {}
+        strategy = guidance.get("strategy")
+        notes = (guidance.get("candidate_notes") or "").strip()
+        if strategy:
+            yield {
+                "type": "thought",
+                "step": "audit",
+                "content": f"Human-in-the-Loop Guidance Active: Strategy='{strategy}'" + (f", Notes: '{notes}'" if notes else "") + ". Framing profile with transferable engineering strengths without false claims.",
+                "timestamp": now_str(),
+            }
+            await asyncio.sleep(0.15)
+
         llm = self._get_llm(config)
         tailored_resume = None
 
@@ -344,6 +358,7 @@ class GeneratorChain:
                     company=target_company,
                     doc_type=doc_type,
                     company_research=company_research_data,
+                    human_guidance=job_input.human_guidance,
                 ):
                     if chunk_ev.get("type") == "llm_complete":
                         tailored_resume = chunk_ev["resume"]
@@ -373,6 +388,7 @@ class GeneratorChain:
                 company=target_company,
                 doc_type=doc_type,
                 company_research=company_research_data,
+                human_guidance=job_input.human_guidance,
             ):
                 if chunk_ev.get("type") == "heuristic_complete":
                     tailored_resume = chunk_ev["resume"]
@@ -480,14 +496,25 @@ class GeneratorChain:
             "RAG", "Streaming", "State Management", "NgRx", "Cypress", "Playwright", "Karma", "Jest",
             "Docker", "Kubernetes", "CI/CD", "Azure", "AWS", "GCP", "Webpack", "Vite",
             "Accessibility", "WCAG", "Performance", "Web Vitals", "Optimization", "SaaS",
-            "Tailwind", "SCSS", "HTML5", "CSS3", "Git"
+            "Tailwind", "SCSS", "HTML5", "CSS3", "Git",
+            # Systems, Embedded & Hardware
+            "C", "C++", "FreeRTOS", "RTOS", "ARM Cortex", "Cortex-M4", "Embedded Systems",
+            "Firmware", "CAN bus", "UART", "SPI", "I2C", "Microcontrollers", "PCB", "Hardware",
+            # Mobile
+            "Swift", "iOS", "Kotlin", "Android", "React Native", "Flutter",
+            # Backend & Distributed Systems
+            "Golang", "Go", "Rust", "Java", "Spring Boot", "Kafka", "PostgreSQL", "Redis"
         ]
 
         found_tech: List[str] = []
         lower_job = job_text.lower()
         for tech in common_tech:
-            if re.search(rf"\b{re.escape(tech.lower())}\b", lower_job):
-                found_tech.append(tech)
+            if len(tech) <= 2:
+                if re.search(rf"\b{re.escape(tech)}\b", job_text):
+                    found_tech.append(tech)
+            else:
+                if re.search(rf"\b{re.escape(tech.lower())}\b", lower_job):
+                    found_tech.append(tech)
 
         # 1. Company Extraction
         company = None
@@ -521,7 +548,7 @@ class GeneratorChain:
         role = target_title
         if not role:
             role_match = re.search(
-                r"((?:Senior|Staff|Lead|Principal|Junior|Mid|Head of)?\s*(?:Frontend|Front-end|Backend|Back-end|Full\s*Stack|Software|UI/UX|UI|Web|Platform)\s*(?:Engineer|Developer|Architect|Lead))",
+                r"((?:Senior|Staff|Lead|Principal|Junior|Mid|Head of)?\s*(?:Frontend|Front-end|Backend|Back-end|Full\s*Stack|Software|UI/UX|UI|Web|Platform|Embedded|Firmware|Mobile|iOS|Android|DevOps|Systems)\s*(?:Engineer|Developer|Architect|Lead))",
                 job_text,
                 re.I,
             )
@@ -536,6 +563,14 @@ class GeneratorChain:
                     "Angular", "TypeScript", "Signals", "RxJS", "Frontend Architecture",
                     "State Management", "Design Systems", "Performance Optimization",
                     "Nx Monorepos", "Testing & Automation"
+                ]
+            elif any(term in role_lower for term in ["embedded", "firmware", "hardware", "iot"]):
+                domain_defaults = [
+                    "C", "Embedded Systems", "FreeRTOS", "ARM Cortex", "Firmware", "Microcontrollers"
+                ]
+            elif any(term in role_lower for term in ["mobile", "ios", "swift", "android"]):
+                domain_defaults = [
+                    "Mobile Architecture", "iOS", "Swift", "Android", "Kotlin", "Cross-Platform"
                 ]
             elif any(term in role_lower for term in ["full stack", "fullstack", "software"]):
                 domain_defaults = [
@@ -563,25 +598,37 @@ class GeneratorChain:
             for s in cat_skills:
                 candidate_skills.add(s.lower().strip())
 
-        # Also collect skills mentioned in base experience highlights
-        for exp in base.experience:
-            for h in exp.highlights:
-                for kw in keywords:
-                    if kw.lower() in h.lower():
-                        candidate_skills.add(kw.lower())
-
-        # Also collect competencies mentioned anywhere in candidate's complete Base Knowledge
+        # Collect raw knowledge corpus
         corpus_parts = [base.raw_text or "", base.summary or ""]
+        for exp in base.experience:
+            corpus_parts.extend(exp.highlights)
+            corpus_parts.extend(getattr(exp, "technologies", []) or [])
         for p in (base.projects or []):
             corpus_parts.extend([p.name, p.description] + p.technologies)
         for c in (base.certifications or []):
             corpus_parts.extend([c.name, c.issuer])
 
-        full_corpus = " ".join(corpus_parts).lower()
+        full_corpus_raw = " ".join(corpus_parts)
+        full_corpus_lower = full_corpus_raw.lower()
+
         for kw in keywords:
-            kw_low = kw.lower().strip()
-            if kw_low and re.search(rf"\b{re.escape(kw_low)}\b", full_corpus):
-                candidate_skills.add(kw_low)
+            kw_clean = kw.strip()
+            kw_low = kw_clean.lower()
+            if not kw_clean:
+                continue
+
+            # If keyword is single letter like 'C', require explicit language context
+            if len(kw_clean) == 1:
+                is_explicit_skill = any(kw_clean == s.strip() or kw_low == s.strip().lower() for s in sum(base.skills.values(), []))
+                if is_explicit_skill or re.search(r"\bC\b(?:\s*(?:programming|language|\+\+|/C\+\+))", full_corpus_raw):
+                    candidate_skills.add(kw_low)
+            elif len(kw_clean) == 2:
+                # 2-letter tokens like 'Go', 'Nx', 'UI'
+                if re.search(rf"\b{re.escape(kw_clean)}\b", full_corpus_raw) or re.search(rf"\b{re.escape(kw_low)}\b", full_corpus_lower):
+                    candidate_skills.add(kw_low)
+            else:
+                if re.search(rf"\b{re.escape(kw_low)}\b", full_corpus_lower):
+                    candidate_skills.add(kw_low)
 
         direct_matches = []
         transferable = []
@@ -593,6 +640,12 @@ class GeneratorChain:
             "graphql": ["REST APIs & Schema Design"],
             "microfrontends": ["Nx Monorepo & Modular Library Architecture"],
             "vue": ["Reactive UI Frameworks (Angular Deep Expertise)"],
+            "docker": ["Containerization & Modern CI/CD Pipelines"],
+            "kubernetes": ["Cloud Infrastructure & Container Orchestration (Azure Experience)"],
+            "node.js": ["JavaScript/TypeScript Server & Tooling"],
+            "nodejs": ["JavaScript/TypeScript Server & Tooling"],
+            "python": ["Backend Scripting & Microservices Architecture (.NET Core Experience)"],
+            "cloud": ["Cloud Platforms & CI/CD Infrastructure (Azure Experience)"],
         }
 
         for kw in keywords:
@@ -607,10 +660,21 @@ class GeneratorChain:
         # Base match score calculation
         total_reqs = len(keywords) or 1
         raw_score = int(((len(direct_matches) * 1.0 + len(transferable) * 0.5) / total_reqs) * 100)
-        score = max(72, min(97, raw_score + 15))  # High-confidence calibrated score
+
+        # Honest scoring without artificial 72% floor for mismatch or non-matching roles
+        if len(direct_matches) == 0:
+            score = max(5, min(30, raw_score))
+            is_low_match = True
+        elif raw_score < 40:
+            score = max(15, min(48, raw_score + 5))
+            is_low_match = True
+        else:
+            score = max(65, min(97, raw_score + 15))
+            is_low_match = False
 
         return AlignmentReport(
             match_score=score,
+            is_low_match=is_low_match,
             target_role=target_role,
             direct_matches=direct_matches,
             transferable_skills=transferable,
@@ -619,9 +683,45 @@ class GeneratorChain:
                 f"Elevated direct competencies in {', '.join(direct_matches[:3])}. "
                 f"Positioned experience bullet points to highlight large-scale systems and architecture. "
                 f"Enforced strict non-hallucination guardrail omitting unverified tools."
+            ) if not is_low_match else (
+                f"Low direct alignment detected ({len(direct_matches)} direct match(es)). "
+                f"Target role requires core competencies ({', '.join(unmatched[:4])}) outside verified Source of Truth. "
+                f"Candidate human guidance or transferable framing applied."
             ),
             anti_hallucination_audit=[],
             overall_status="PASSED",
+        )
+
+    def preflight_check(self, job_input: JobInput, base_resume: ResumeData) -> PreflightReport:
+        """
+        Fast preflight evaluation to detect role/competency mismatch before generation stream begins.
+        Enables Human-in-the-Loop decision flow when candidate skills and job requirements diverge.
+        """
+        job_text = (job_input.job_description or "").strip()
+        keywords, target_role, target_company, _ = self._extract_job_keywords(
+            job_text, job_input.target_title
+        )
+        audit = self._perform_competency_audit(base_resume, keywords, target_role)
+
+        if audit.is_low_match:
+            missing_preview = ", ".join(audit.unmatched_skills[:4]) if audit.unmatched_skills else "target requirements"
+            msg = (
+                f"Low alignment detected ({audit.match_score}% match). The role emphasizes competencies "
+                f"({missing_preview}) not verified in your Source of Truth. "
+                f"Choose a Human-in-the-Loop strategy before proceeding."
+            )
+        else:
+            direct_preview = ", ".join(audit.direct_matches[:4]) if audit.direct_matches else "verified skills"
+            msg = f"Strong alignment ({audit.match_score}% match) with direct competencies in {direct_preview}."
+
+        return PreflightReport(
+            match_score=audit.match_score,
+            is_low_match=audit.is_low_match,
+            target_role=target_role,
+            direct_matches=audit.direct_matches,
+            unmatched_skills=audit.unmatched_skills,
+            transferable_skills=audit.transferable_skills,
+            message=msg,
         )
 
     async def _stream_heuristic_alignment(
@@ -632,6 +732,7 @@ class GeneratorChain:
         company: Optional[str] = None,
         doc_type: str = "resume",
         company_research: Optional[Dict[str, Any]] = None,
+        human_guidance: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[Dict, None]:
         """Paced real-time reasoning stream for deterministic alignment engine."""
         now_str = lambda: datetime.now().strftime("%H:%M:%S")
@@ -665,7 +766,13 @@ class GeneratorChain:
             await asyncio.sleep(0.1)
 
         tailored = self._align_resume_heuristically(
-            base, audit, target_role, company=company, doc_type=doc_type, company_research=company_research
+            base,
+            audit,
+            target_role,
+            company=company,
+            doc_type=doc_type,
+            company_research=company_research,
+            human_guidance=human_guidance,
         )
         yield {"type": "heuristic_complete", "resume": tailored}
 
@@ -677,33 +784,55 @@ class GeneratorChain:
         company: Optional[str] = None,
         doc_type: str = "resume",
         company_research: Optional[Dict[str, Any]] = None,
+        human_guidance: Optional[Dict[str, Any]] = None,
     ) -> ResumeData:
         """
         High-precision deterministic alignment that reframes summary and elevates matching highlights
         without altering authentic facts, companies, or dates.
         """
-        top_matches = ", ".join(audit.direct_matches[:4]) if audit.direct_matches else "Angular, TypeScript, and Scalable UI Architecture"
+        guidance = human_guidance or {}
+        strategy = guidance.get("strategy")
+        notes = (guidance.get("candidate_notes") or "").strip()
+        is_mismatch = audit.is_low_match or strategy in ("transferable", "strict_factual")
         company_phrase = f" for {company}" if company else ""
 
-        if doc_type == "cv":
-            company_target = f" targeting {company}'s SaaS ecosystem" if company else ""
-            tailored_summary = (
-                f"Distinguished {target_role} and Frontend Architect with 7+ years of engineering leadership designing "
-                f"high-performance, reliable, and accessible enterprise web platforms{company_target}. "
-                f"Deep technical mastery across {top_matches}. Proven track record managing large-scale Nx monorepos, "
-                f"driving Angular migrations (v15 to modern v20 standalone & signals), reducing duplicated frontend code by 35–40%, "
-                f"and accelerating CI/CD build pipelines by 25–35%. Substantial international experience collaborating with distributed "
-                f"European engineering teams, including Dutch enterprise client Maistering B.V. and AVEVA. "
-                f"Adept at technical governance, cross-functional mentoring, and executing production-grade UI architecture."
-            )
+        if is_mismatch:
+            role_display = base.target_role or "Senior Software Engineer"
+            transferable_note = f" Candidate focus: {notes}." if notes else ""
+            if doc_type == "cv":
+                tailored_summary = (
+                    f"Versatile {role_display} with 7+ years of engineering leadership architecting resilient, high-scale "
+                    f"systems and modern platforms{company_phrase}. Renowned for engineering agility, rigorous systems thinking, "
+                    f"and rapid mastery of new paradigms. Proven record modernizing enterprise architectures, driving CI/CD optimizations, "
+                    f"and delivering scalable software solutions across distributed international teams.{transferable_note}"
+                )
+            else:
+                tailored_summary = (
+                    f"Accomplished {role_display} with 7+ years of deep expertise in software architecture, enterprise systems, "
+                    f"and high-performance engineering. Known for technical agility, strict code quality, and proven capacity "
+                    f"to adapt core architectural principles to complex technical challenges{company_phrase}.{transferable_note}"
+                )
         else:
-            tailored_summary = (
-                f"Accomplished {target_role} with 7+ years of proven track record designing and architecting "
-                f"high-scale enterprise web applications. Deep specialization in {top_matches}. "
-                f"Extensive production experience modernizing complex legacy applications, optimizing Nx monorepos "
-                f"(25–35% build speedups), and integrating AI-driven interfaces (LangChain, streaming systems). "
-                f"Well-suited for driving frontend architecture, code quality, and high-performance user experiences{company_phrase}."
-            )
+            top_matches = ", ".join(audit.direct_matches[:4]) if audit.direct_matches else "Angular, TypeScript, and Scalable UI Architecture"
+            if doc_type == "cv":
+                company_target = f" targeting {company}'s SaaS ecosystem" if company else ""
+                tailored_summary = (
+                    f"Distinguished {target_role} and Frontend Architect with 7+ years of engineering leadership designing "
+                    f"high-performance, reliable, and accessible enterprise web platforms{company_target}. "
+                    f"Deep technical mastery across {top_matches}. Proven track record managing large-scale Nx monorepos, "
+                    f"driving Angular migrations (v15 to modern v20 standalone & signals), reducing duplicated frontend code by 35–40%, "
+                    f"and accelerating CI/CD build pipelines by 25–35%. Substantial international experience collaborating with distributed "
+                    f"European engineering teams, including Dutch enterprise client Maistering B.V. and AVEVA. "
+                    f"Adept at technical governance, cross-functional mentoring, and executing production-grade UI architecture."
+                )
+            else:
+                tailored_summary = (
+                    f"Accomplished {target_role} with 7+ years of proven track record designing and architecting "
+                    f"high-scale enterprise web applications. Deep specialization in {top_matches}. "
+                    f"Extensive production experience modernizing complex legacy applications, optimizing Nx monorepos "
+                    f"(25–35% build speedups), and integrating AI-driven interfaces (LangChain, streaming systems). "
+                    f"Well-suited for driving frontend architecture, code quality, and high-performance user experiences{company_phrase}."
+                )
 
         # Re-prioritize skills: Put primary matches first
         new_skills: Dict[str, List[str]] = {}
@@ -715,6 +844,7 @@ class GeneratorChain:
 
         # Re-prioritize and emphasize experience highlights
         new_experience: List[ExperienceItem] = []
+        base_all_skills = [s.lower() for cat_s in base.skills.values() for s in cat_s]
         for exp in base.experience:
             sorted_highlights = sorted(
                 exp.highlights,
@@ -735,8 +865,10 @@ class GeneratorChain:
                 scope = "Senior Frontend Engineer delivering enterprise AI applications and cross-platform mobile software for Netherlands-based enterprise clients."
                 techs = ["Angular", "NgRx", "TypeScript", ".NET Core", "Xamarin", "REST APIs", "Agile/Scrum"]
             else:
-                scope = "Senior technical leader responsible for frontend architecture, code quality, and delivery of scalable web applications."
-                techs = audit.direct_matches[:6]
+                scope = "Senior technical leader responsible for software architecture, code quality, and delivery of scalable applications."
+                techs = [m for m in audit.direct_matches if any(m.lower() in s for s in base_all_skills)][:6]
+                if not techs:
+                    techs = [s for s in (base.skills.get("Core Frontend Architecture & Frameworks") or base.skills.get("Core Engineering") or ["TypeScript", "Angular", "System Architecture"])][:5]
 
             new_experience.append(
                 ExperienceItem(
@@ -750,69 +882,23 @@ class GeneratorChain:
                 )
             )
 
-        if doc_type == "cv":
+        if is_mismatch:
+            tagline = "Software Engineering Architecture • Disciplined Systems & Scalability"
+            if company:
+                tagline += f" • Aligned for {company}"
+        elif doc_type == "cv":
             tagline = f"Senior Frontend Architecture • {', '.join(audit.direct_matches[:3]) if audit.direct_matches else 'Angular & Scalable Web Platforms'}"
         else:
             tagline = f"Enterprise Architecture • {', '.join(audit.direct_matches[:3]) if audit.direct_matches else 'Scalable UI'}"
             if company:
                 tagline += f" • Aligned for {company}"
 
-        # Populate or enrich architectural projects for CV
+        # Preserve genuine architectural projects from base profile if present
         cv_projects = list(base.projects or [])
-        if doc_type == "cv" and (not cv_projects or not any(p.description for p in cv_projects)):
-            cv_projects = [
-                ProjectItem(
-                    name="Enterprise Angular Modernization & Signals Architecture",
-                    role="Lead Frontend Architect",
-                    period="2025 – Present",
-                    description="Led large-scale migration of mission-critical enterprise web platform from Angular v15 to v20 adopting standalone components, signals-driven reactivity, and modern control flow. Redesigned core abstractions across 5+ integrated product applications, eliminating legacy technical debt and accelerating feature delivery.",
-                    technologies=["Angular 20", "Signals", "TypeScript", "RxJS", "Microfrontends"],
-                    url="https://github.com/TechieWithBeard"
-                ),
-                ProjectItem(
-                    name="Nx Monorepo Architecture & CI/CD Pipeline Acceleration",
-                    role="Monorepo Architect",
-                    period="2025",
-                    description="Took full ownership of a multi-application enterprise Nx monorepo supporting 5+ product modules. Restructured computation caching, affected-module build graphs, and CI pipelines, cutting build and test execution times by 25–35% across European distributed engineering teams.",
-                    technologies=["Nx Monorepo", "Webpack", "Azure CI/CD", "Distributed Caching"],
-                    url="https://github.com/TechieWithBeard"
-                ),
-                ProjectItem(
-                    name="Shared Enterprise UI Design System & Component Library",
-                    role="UI Design System Lead",
-                    period="2023 – 2024",
-                    description="Architected and governed an enterprise-wide design system and reusable component library distributed via private Azure Artifacts. Reduced duplicate UI code across European development teams by 35–40% and enforced strict accessibility and visual consistency standards.",
-                    technologies=["Angular", "TypeScript", "SCSS", "Storybook", "WCAG 2.1 AA"],
-                    url="https://github.com/TechieWithBeard"
-                ),
-            ]
 
-        # Populate certifications for CV
+        # Strictly preserve genuine certifications and publications from base profile
         cv_certs = list(base.certifications or [])
-        if doc_type == "cv" and not cv_certs:
-            cv_certs = [
-                CertificationItem(
-                    name="AWS Certified Solutions Architect – Associate",
-                    issuer="Amazon Web Services",
-                    year="2023",
-                    credential_id="AWS-ARCH-84920",
-                    url="https://aws.amazon.com/certification/"
-                ),
-                CertificationItem(
-                    name="Meta Front-End Developer Professional Certificate",
-                    issuer="Meta",
-                    year="2022",
-                    credential_id="META-FE-59302",
-                    url="https://coursera.org"
-                ),
-            ]
-
         cv_pubs = list(base.publications or [])
-        if doc_type == "cv" and not cv_pubs:
-            cv_pubs = [
-                "Technical Case Study: High-Scale Monorepo Strategies in Modern Enterprise Angular",
-                "Architecture Guide: Migrating Legacy Enterprise Web Platforms to Signals & Standalone Components",
-            ]
 
         why_company = ""
         why_fit = ""
@@ -829,6 +915,7 @@ class GeneratorChain:
             phone=base.phone,
             linkedin=base.linkedin,
             github=base.github,
+            portfolio=getattr(base, "portfolio", "") or "",
             summary=tailored_summary,
             availability=base.availability,
             experience=new_experience,
@@ -935,18 +1022,23 @@ class GeneratorChain:
         audit: AlignmentReport,
     ) -> str:
         clean_comp = company.strip() if company else "the organization"
-        top_skills = ", ".join(audit.direct_matches[:3]) if audit.direct_matches else "modern Angular, reactive Signals, and TypeScript"
+        if audit.is_low_match:
+            top_skills = "scalable system architecture, automated testing, and disciplined software governance"
+            role_intent = f"the technical challenges of the {target_role} initiatives"
+        else:
+            top_skills = ", ".join(audit.direct_matches[:3]) if audit.direct_matches else "modern Angular, reactive Signals, and TypeScript"
+            role_intent = f"the technical objectives of the {target_role} position"
 
         p1 = (
-            f"With over 7 years of hands-on frontend architecture and engineering leadership, I bring a verified track record that "
-            f"directly accelerates the technical objectives of the {target_role} position at {clean_comp}. In my recent roles at AVEVA "
+            f"With over 7 years of hands-on software architecture and engineering leadership, I bring a verified track record that "
+            f"directly accelerates {role_intent} at {clean_comp}. In my recent roles at AVEVA "
             f"and ACI Logistix, I spearheaded zero-downtime migrations to Angular 20 and reactive Signals, took full ownership of enterprise "
             f"Nx monorepos supporting multi-application ecosystems, and cut build and test execution cycles by 25–35%."
         )
         p2 = (
             f"Furthermore, my extensive experience collaborating with distributed European engineering teams ensures seamless cross-functional "
             f"communication, proactive code quality governance, and immediate technical velocity. Having modernized legacy platforms into "
-            f"resilient, modular systems using {top_skills}, I am equipped to dive in from day one—elevating frontend standards, "
+            f"resilient, modular systems using {top_skills}, I am equipped to dive in from day one—elevating engineering standards, "
             f"optimizing performance, and executing your platform roadmap with confidence."
         )
         return f"{p1}\n\n{p2}"
@@ -961,6 +1053,7 @@ class GeneratorChain:
         company: Optional[str] = None,
         doc_type: str = "resume",
         company_research: Optional[Dict[str, Any]] = None,
+        human_guidance: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[Dict, None]:
         """
         Runs LangChain streaming chain (astream) with strict anti-hallucination system prompt.
@@ -1005,11 +1098,24 @@ class GeneratorChain:
                 "1. You MUST ONLY use the candidate's verified companies, employment dates, and educational credentials. "
                 "NEVER invent new employers or change dates.\n"
                 "2. You MUST NOT add skills or tools the candidate has never used. Only emphasize and highlight real skills.\n"
-                "3. Reframe bullet points to highlight measurable business impact, architecture decisions, and target keywords.\n\n"
+                "3. Reframe bullet points to highlight measurable business impact, architecture decisions, and target keywords.\n"
+                "4. 'skills': MUST preserve all verified candidate skills grouped by category, reordering them so target keywords appear first. DO NOT omit or empty skills.\n\n"
                 "TWO-PHASE OUTPUT REQUIREMENTS:\n"
                 "Phase 1: Write your Strategic Alignment Reasoning (3-5 concise sentences explaining the alignment strategy, "
                 "key technical skills prioritized, and high-impact achievements elevated).\n"
                 "Phase 2: Output the complete tailored resume JSON enclosed inside ```json ... ``` code blocks."
+            )
+
+        guidance_text = ""
+        if human_guidance:
+            strategy = human_guidance.get("strategy", "transferable")
+            notes = human_guidance.get("candidate_notes", "")
+            guidance_text = (
+                f"\nHUMAN-IN-THE-LOOP CANDIDATE GUIDANCE:\n"
+                f"- Selected Strategy: {strategy}\n"
+                f"- Candidate Focus Notes: {notes}\n"
+                f"- DIRECTIVE: Strictly respect candidate's guidance. Frame profile around transferable capabilities, "
+                f"architectural discipline, and rapid ramp-up without inventing unverified skills.\n"
             )
 
         user_content = (
@@ -1018,7 +1124,8 @@ class GeneratorChain:
             f"DOCUMENT TYPE: {doc_type.upper()}\n\n"
             f"JOB SPECIFICATION:\n{job_text[:15000]}\n\n"
             f"VERIFIED CANDIDATE BASE PROFILE:\n{json.dumps(base.model_dump(), indent=2)}\n\n"
-            f"VERIFIED DIRECT SKILLS:\n{', '.join(audit.direct_matches)}\n\n"
+            f"VERIFIED DIRECT SKILLS:\n{', '.join(audit.direct_matches)}\n"
+            f"{guidance_text}\n"
             f"INSTRUCTION: Begin with Phase 1 (Strategic Alignment Reasoning), followed immediately by Phase 2 (```json ... ```)."
         )
 
@@ -1203,6 +1310,7 @@ class GeneratorChain:
         generated.phone = base.phone
         generated.linkedin = base.linkedin
         generated.github = base.github
+        generated.portfolio = getattr(base, "portfolio", "") or ""
         generated.name = base.name
 
         audit_items.append(
@@ -1219,7 +1327,7 @@ class GeneratorChain:
             if not getattr(generated, "why_company", None) or not getattr(generated, "why_fit", None):
                 heuristic = self._align_resume_heuristically(
                     base,
-                    AlignmentReport(match_score=80, target_role=target_role or "Senior Frontend Developer"),
+                    AlignmentReport(match_score=80, target_role=target_role or "Senior Frontend Developer", alignment_strategy="Aligned strategic value drivers"),
                     target_role=target_role or "Senior Frontend Developer",
                     company=company,
                     doc_type="cv",
@@ -1241,7 +1349,7 @@ class GeneratorChain:
                 else:
                     heuristic = self._align_resume_heuristically(
                         base,
-                        AlignmentReport(match_score=80, target_role=target_role or "Senior Frontend Developer"),
+                        AlignmentReport(match_score=80, target_role=target_role or "Senior Frontend Developer", alignment_strategy="Aligned strategic value drivers"),
                         target_role=target_role or "Senior Frontend Developer",
                         company=company,
                         doc_type="cv",
@@ -1263,17 +1371,118 @@ class GeneratorChain:
                         exp.scope = exp.scope or "Senior Frontend Engineer delivering enterprise AI applications and cross-platform mobile software for Netherlands-based enterprise clients."
                         exp.technologies = exp.technologies or ["Angular", "NgRx", "TypeScript", ".NET Core", "Xamarin", "REST APIs", "Agile/Scrum"]
 
-            if not generated.certifications and base.certifications:
-                generated.certifications = base.certifications
-            if not generated.publications and base.publications:
-                generated.publications = base.publications
+        # 5. Verify Skills Invariance & Completeness
+        base_skills_count = sum(len(v) for v in (base.skills or {}).values())
+        gen_skills_count = sum(len(v) for v in (generated.skills or {}).values()) if generated.skills else 0
+
+        if gen_skills_count == 0 and base_skills_count > 0:
+            audit_items.append(
+                AlignmentAuditItem(
+                    check="Skills Completeness",
+                    status="WARNING",
+                    details="Tailored resume omitted skills section. Restoring 100% verified skills taxonomy from base profile.",
+                )
+            )
+            generated.skills = {k: list(v) for k, v in base.skills.items()}
+        elif base_skills_count > 0:
+            for cat, s_list in (base.skills or {}).items():
+                if cat not in generated.skills or not generated.skills[cat]:
+                    generated.skills[cat] = list(s_list)
+            audit_items.append(
+                AlignmentAuditItem(
+                    check="Skills Completeness",
+                    status="PASSED",
+                    details=f"Verified technical competencies preserved across {len(generated.skills)} categories.",
+                )
+            )
+
+        # 6. Invariance for Projects, Certifications & Publications
+        if not base.projects:
+            generated.projects = []
+        elif not generated.projects:
+            generated.projects = list(base.projects)
+
+        if not base.certifications:
+            generated.certifications = []
         else:
-            if not generated.projects and base.projects:
-                generated.projects = base.projects
-            if not generated.certifications and base.certifications:
-                generated.certifications = base.certifications
-            if not generated.publications and base.publications:
-                generated.publications = base.publications
+            base_cert_names = {c.name.strip().lower() for c in base.certifications}
+            matched_certs = [c for c in (generated.certifications or []) if c.name.strip().lower() in base_cert_names]
+            generated.certifications = matched_certs if matched_certs else list(base.certifications)
+
+        if not base.publications:
+            generated.publications = []
+        else:
+            base_pub_names = {p.strip().lower() for p in base.publications}
+            matched_pubs = [p for p in (generated.publications or []) if p.strip().lower() in base_pub_names]
+            generated.publications = matched_pubs if matched_pubs else list(base.publications)
+
+        # 7. Strict Skills Non-Fabrication Gate
+        base_verified_corpus = set()
+        for cat_skills in (base.skills or {}).values():
+            for s in cat_skills:
+                base_verified_corpus.add(s.strip().lower())
+                for sub in re.split(r"[/,()&|•]+", s):
+                    sub_clean = sub.strip().lower()
+                    if sub_clean:
+                        base_verified_corpus.add(sub_clean)
+
+        for exp in base.experience:
+            for h in exp.highlights:
+                base_verified_corpus.add(h.strip().lower())
+            for t in getattr(exp, "technologies", []) or []:
+                base_verified_corpus.add(t.strip().lower())
+        for p in (base.projects or []):
+            base_verified_corpus.add(p.name.strip().lower())
+            for t in (p.technologies or []):
+                base_verified_corpus.add(t.strip().lower())
+        for c in (base.certifications or []):
+            base_verified_corpus.add(c.name.strip().lower())
+
+        base_raw_low = (
+            (base.raw_text or "") + " " +
+            (base.summary or "") + " " +
+            " ".join(base_verified_corpus)
+        ).lower()
+
+        purged_skills = []
+        clean_skills: Dict[str, List[str]] = {}
+        for cat, s_list in (generated.skills or {}).items():
+            valid_s_list = []
+            for s in s_list:
+                s_clean = s.strip()
+                s_low = s_clean.lower()
+                is_grounded = (
+                    s_low in base_verified_corpus or
+                    bool(re.search(rf"\b{re.escape(s_low)}\b", base_raw_low))
+                )
+                if is_grounded:
+                    valid_s_list.append(s_clean)
+                else:
+                    purged_skills.append(s_clean)
+            if valid_s_list:
+                clean_skills[cat] = valid_s_list
+
+        if not clean_skills:
+            clean_skills = {k: list(v) for k, v in (base.skills or {}).items()}
+
+        generated.skills = clean_skills
+
+        if purged_skills:
+            audit_items.append(
+                AlignmentAuditItem(
+                    check="Strict Skills Non-Fabrication Gate",
+                    status="WARNING",
+                    details=f"Purged {len(purged_skills)} ungrounded skill(s) not present in Source of Truth: {', '.join(purged_skills[:5])}.",
+                )
+            )
+        else:
+            audit_items.append(
+                AlignmentAuditItem(
+                    check="Strict Skills Non-Fabrication Gate",
+                    status="PASSED",
+                    details="Zero hallucinated skills detected. 100% of skills verified against Source of Truth.",
+                )
+            )
 
         generated.document_type = "cv" if doc_type == "cv" else "resume"
         generated.target_role = target_role or getattr(generated, "target_role", None) or getattr(base, "target_role", None)

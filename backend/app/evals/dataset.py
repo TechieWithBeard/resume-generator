@@ -216,4 +216,54 @@ Our recruitment process:
         minimum_match_score=50,
         tags=["edge-case", "sparse", "resume"],
     ),
+
+    EvalCase(
+        id="case_extreme_mismatch_hitl",
+        name="Senior Embedded Firmware Engineer (Extreme Mismatch & HITL)",
+        description=(
+            "Adversarial domain mismatch testing Human-in-the-Loop preflight detection "
+            "and strict non-fabrication of unverified hardware/embedded competencies (C, FreeRTOS, ARM, CAN bus)."
+        ),
+        job_input=JobInput(
+            target_title="Senior Embedded Firmware Engineer",
+            document_type="resume",
+            job_description="""
+We are seeking a Senior Embedded Firmware Engineer for real-time safety-critical automotive systems.
+Responsibilities:
+- Write bare-metal firmware and real-time kernels in C and Assembly for ARM Cortex-M4 microcontrollers.
+- Develop device drivers for CAN bus, UART, SPI, and I2C peripherals.
+- Optimize FreeRTOS task scheduling, memory footprint, and low-power sleep modes.
+- Perform hardware-in-the-loop (HIL) testing and PCB debugging using oscilloscopes and logic analyzers.
+
+Requirements:
+- 5+ years of embedded systems and firmware development in pure C.
+- Deep expertise in FreeRTOS, ARM Cortex, and CAN bus protocols.
+- Experience reading hardware schematics and PCB layout debugging.
+            """.strip(),
+            human_guidance={
+                "strategy": "transferable",
+                "candidate_notes": "Emphasize core systems thinking, performance profiling, and engineering discipline",
+                "confirmed_proceed": True,
+            },
+        ),
+        document_type="resume",
+        template_id="modern",
+        expected_invariants=[
+            "Parnasoft Technologies — Client: AVEVA",
+            "ACI Logistix",
+            "Maistering B.V",
+            "Manipal Academy of Higher Education",
+        ],
+        forbidden_terms=[
+            "FreeRTOS",
+            "ARM Cortex",
+            "CAN bus",
+            "PCB debugging",
+            "bare-metal firmware",
+            "oscilloscopes",
+        ],
+        required_keywords=[],
+        minimum_match_score=5,
+        tags=["hitl", "mismatch", "anti-hallucination", "zero-fabrication"],
+    ),
 ]

@@ -4,7 +4,7 @@ Strict Pydantic models for validation, serialization, and typing.
 """
 
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Availability(BaseModel):
@@ -56,12 +56,36 @@ class ResumeData(BaseModel):
     phone: Optional[str] = ""
     linkedin: Optional[str] = ""
     github: Optional[str] = ""
+    portfolio: Optional[str] = ""
     summary: str
     availability: Optional[Availability] = None
     experience: List[ExperienceItem] = Field(default_factory=list)
     education: List[EducationItem] = Field(default_factory=list)
     skills: Dict[str, List[str]] = Field(default_factory=dict)
     projects: List[ProjectItem] = Field(default_factory=list)
+
+    @field_validator("skills", mode="before")
+    @classmethod
+    def normalize_skills(cls, v: Any) -> Dict[str, List[str]]:
+        if not v:
+            return {}
+        if isinstance(v, list):
+            clean_list = [str(item).strip() for item in v if item]
+            return {"Technical Skills": clean_list}
+        if isinstance(v, dict):
+            normalized = {}
+            for cat, items in v.items():
+                if isinstance(items, list):
+                    normalized[cat] = [str(i).strip() for i in items if i]
+                elif isinstance(items, str):
+                    normalized[cat] = [i.strip() for i in items.split(",") if i.strip()]
+                elif items is not None:
+                    normalized[cat] = [str(items).strip()]
+            return normalized
+        if isinstance(v, str):
+            clean_list = [s.strip() for s in v.split(",") if s.strip()]
+            return {"Technical Skills": clean_list}
+        return {}
     certifications: List[CertificationItem] = Field(default_factory=list)
     publications: List[str] = Field(default_factory=list)
     document_type: Literal["resume", "cv"] = "resume"
@@ -80,6 +104,7 @@ class JobInput(BaseModel):
     linkedin_url: Optional[str] = None
     target_title: Optional[str] = None
     document_type: Literal["resume", "cv"] = "resume"
+    human_guidance: Optional[Dict[str, Any]] = None
 
 
 class LLMConfig(BaseModel):
@@ -98,13 +123,24 @@ class AlignmentAuditItem(BaseModel):
 
 class AlignmentReport(BaseModel):
     match_score: int = Field(ge=0, le=100)
+    is_low_match: bool = False
     target_role: str
     direct_matches: List[str] = Field(default_factory=list)
     transferable_skills: List[str] = Field(default_factory=list)
     unmatched_skills: List[str] = Field(default_factory=list)
-    alignment_strategy: str
+    alignment_strategy: str = "Aligned with target role specifications."
     anti_hallucination_audit: List[AlignmentAuditItem] = Field(default_factory=list)
     overall_status: Literal["PASSED", "REJECTED"] = "PASSED"
+
+
+class PreflightReport(BaseModel):
+    match_score: int = Field(ge=0, le=100)
+    is_low_match: bool = False
+    target_role: str = ""
+    direct_matches: List[str] = Field(default_factory=list)
+    unmatched_skills: List[str] = Field(default_factory=list)
+    transferable_skills: List[str] = Field(default_factory=list)
+    message: str = ""
 
 
 class TemplateConfig(BaseModel):

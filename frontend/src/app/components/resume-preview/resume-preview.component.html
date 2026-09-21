@@ -10,30 +10,30 @@
           class="px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all duration-150 cursor-pointer"
           [ngClass]="viewMode() === 'single' ? 'bg-white text-sky-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
           (click)="onSetViewMode('single')"
-          title="Standard single document view"
+          title="Preview current resume"
         >
           <span>📄</span>
-          <span>Single</span>
+          <span>Single View</span>
         </button>
         <button
           type="button"
           class="px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all duration-150 cursor-pointer"
           [ngClass]="viewMode() === 'split' ? 'bg-white text-indigo-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
           (click)="onSetViewMode('split')"
-          title="Side-by-side comparison between Ground Truth Base Profile and Tailored Document"
+          title="Compare Base Profile (Original) with Tailored Resume"
         >
-          <span>⚖️</span>
-          <span>Side-by-Side</span>
+          <span>↔</span>
+          <span>Compare with Base</span>
         </button>
         <button
           type="button"
           class="px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all duration-150 cursor-pointer"
-          [ngClass]="viewMode() === 'git-diff' ? 'bg-[#0d1117] text-[#3fb950] shadow-sm font-bold border border-[#30363d]' : 'text-slate-600 hover:text-slate-900'"
+          [ngClass]="viewMode() === 'git-diff' ? 'bg-white text-slate-800 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
           (click)="onSetViewMode('git-diff')"
-          title="Git Diff Editor with syntax-highlighted hunks and patch export"
+          title="Raw Text Diff"
         >
-          <span class="font-mono text-[11px] font-extrabold text-[#238636]">+/-</span>
-          <span>Git Diff Editor</span>
+          <span>📝</span>
+          <span>Text Diff</span>
         </button>
       </div>
 
@@ -83,12 +83,12 @@
         <button
           type="button"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 shadow-sm cursor-pointer"
-          [ngClass]="comparisonMode() ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
+          [ngClass]="comparisonMode() ? 'bg-sky-50 text-sky-800 border-sky-300 font-bold' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'"
           (click)="onToggleDiff()"
-          title="Highlight tailored modifications, keyword matches, and adapted achievements"
+          title="Highlight customized keywords aligned to the target role"
         >
           <span>🔍</span>
-          <span>{{ comparisonMode() ? 'Diff Highlights On' : 'Highlight Changes' }}</span>
+          <span>{{ comparisonMode() ? 'Keywords Highlighted' : 'Highlight Tailored Keywords' }}</span>
         </button>
       }
 
@@ -166,28 +166,22 @@
 
   <!-- Split Comparison Info Banner (active when split mode is selected) -->
   @if (viewMode() === 'split') {
-    <div class="px-4 py-2.5 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white border-b border-slate-700 flex flex-wrap items-center justify-between gap-3 text-xs">
-      <div class="flex items-center gap-3">
-        <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold uppercase text-[10px] tracking-wider">
-          ⚖️ Side-by-Side Diff Audit
-        </span>
+    <div class="px-4 py-2 bg-slate-100 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-700">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-slate-800">Profile Comparison:</span>
+        <span class="text-slate-600">Base Profile (Original) vs. Tailored Application</span>
         @if (auditReport()?.target_role) {
-          <span class="font-semibold text-slate-200">
-            Target Alignment: <strong class="text-sky-300">{{ auditReport()?.target_role }}</strong>
-          </span>
+          <span class="text-slate-500 font-medium">for <strong class="text-slate-800">{{ auditReport()?.target_role }}</strong></span>
         }
       </div>
-      <div class="flex items-center gap-4 text-[11px]">
+      <div class="flex items-center gap-3 text-[11px]">
         @if (auditReport()) {
-          <span class="text-slate-300">
-            Match Score: <strong class="text-emerald-400 font-mono">{{ auditReport()?.match_score }}%</strong>
-          </span>
-          <span class="text-slate-300">
-            Direct Matches: <strong class="text-sky-400 font-mono">{{ auditReport()?.direct_matches?.length || 0 }}</strong>
+          <span class="text-slate-600">
+            Keyword Match: <strong class="text-emerald-700 font-semibold">{{ auditReport()?.match_score }}%</strong>
           </span>
         }
-        <span class="text-emerald-400 flex items-center gap-1 font-semibold">
-          <span>🛡️</span> Zero-Hallucination Invariant Verified
+        <span class="text-slate-500 flex items-center gap-1">
+          <span>✓</span> Fact Invariants Preserved
         </span>
       </div>
     </div>
@@ -205,11 +199,10 @@
         >
           <iframe
             #resumeIframe
-            (load)="onIframeLoad($event)"
+            [appIframeHtml]="renderedHtml()"
             class="resume-frame w-full bg-transparent border-0"
             style="min-height: 900px; width: 100%; transition: height 0.15s ease-out;"
             title="Resume Live Preview"
-            [srcdoc]="renderedHtml()"
           ></iframe>
         </div>
       } @else {
@@ -228,9 +221,9 @@
           <div class="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs">
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-              <span class="font-bold text-slate-700 uppercase tracking-wide">Base Profile (Source of Truth)</span>
+              <span class="font-bold text-slate-700 uppercase tracking-wide">Base Profile (Original)</span>
             </div>
-            <span class="text-[10px] font-medium text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded">Unmodified Ground Truth</span>
+            <span class="text-[10px] font-medium text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded">Source of Truth</span>
           </div>
           <div
             class="flex-1 p-2 overflow-auto flex justify-center items-start"
@@ -240,11 +233,10 @@
             @if (baseRenderedHtml()) {
               <iframe
                 #baseResumeIframe
-                (load)="onIframeLoad($event)"
+                [appIframeHtml]="baseRenderedHtml()"
                 class="resume-frame base-resume-frame w-full bg-transparent border-0"
                 style="min-height: 820px;"
                 title="Base Resume Source of Truth"
-                [srcdoc]="baseRenderedHtml()"
               ></iframe>
             } @else {
               <div class="m-auto text-center py-20 text-slate-400 text-xs">
@@ -258,11 +250,11 @@
         <div class="flex flex-col bg-white rounded-xl shadow-md border border-sky-300/80 overflow-hidden">
           <div class="px-4 py-2.5 bg-sky-50 border-b border-sky-200 flex items-center justify-between text-xs">
             <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span class="font-bold text-sky-900 uppercase tracking-wide">Tailored Target Alignment</span>
+              <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+              <span class="font-bold text-sky-900 uppercase tracking-wide">Tailored Application</span>
             </div>
-            <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded">
-              🔍 Diff Highlighting Active
+            <span class="text-[10px] font-semibold text-sky-700 bg-sky-100 border border-sky-200 px-2 py-0.5 rounded">
+              Tailored for Target Role
             </span>
           </div>
           <div
@@ -273,11 +265,10 @@
             @if (renderedHtml()) {
               <iframe
                 #tailoredResumeIframe
-                (load)="onIframeLoad($event)"
+                [appIframeHtml]="renderedHtml()"
                 class="resume-frame tailored-resume-frame w-full bg-transparent border-0"
                 style="min-height: 820px;"
                 title="Tailored Resume with Diff Highlighting"
-                [srcdoc]="renderedHtml()"
               ></iframe>
             } @else {
               <div class="m-auto text-center py-20 text-slate-400 text-xs">

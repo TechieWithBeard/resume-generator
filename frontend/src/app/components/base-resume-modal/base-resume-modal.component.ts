@@ -31,6 +31,9 @@ export class BaseResumeModalComponent {
   formData: ResumeData = {
     name: '',
     title: '',
+    linkedin: '',
+    github: '',
+    portfolio: '',
     summary: '',
     experience: [],
     education: [],

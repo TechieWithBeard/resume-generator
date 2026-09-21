@@ -183,7 +183,7 @@
               type="button"
               class="py-1 text-xs font-semibold rounded-md transition-all text-center cursor-pointer"
               [ngClass]="draftConfig().density === 'compact' ? 'bg-white text-sky-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
-              (click)="updateField('density', 'compact', 0)"
+              (click)="setDensity('compact')"
             >
               Compact
             </button>
@@ -191,7 +191,7 @@
               type="button"
               class="py-1 text-xs font-semibold rounded-md transition-all text-center cursor-pointer"
               [ngClass]="draftConfig().density === 'normal' ? 'bg-white text-sky-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
-              (click)="updateField('density', 'normal', 0)"
+              (click)="setDensity('normal')"
             >
               Standard
             </button>
@@ -199,7 +199,7 @@
               type="button"
               class="py-1 text-xs font-semibold rounded-md transition-all text-center cursor-pointer"
               [ngClass]="draftConfig().density === 'comfortable' ? 'bg-white text-sky-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'"
-              (click)="updateField('density', 'comfortable', 0)"
+              (click)="setDensity('comfortable')"
             >
               Spacious
             </button>
@@ -527,11 +527,10 @@
         @if (previewHtml()) {
           <div class="max-w-[850px] w-full mx-auto flex justify-center">
             <iframe
-              (load)="onIframeLoad($event)"
+              [appIframeHtml]="previewHtml()"
               class="w-full bg-transparent border-0"
               style="min-height: 650px; width: 100%; transition: height 0.15s ease-out;"
               title="Live Template Preview"
-              [srcdoc]="previewHtml()"
             ></iframe>
           </div>
         } @else {

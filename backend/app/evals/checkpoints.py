@@ -88,9 +88,51 @@ class TruthInvarianceCheckpoint:
         if tailored_resume.name.strip().lower() != base_resume.name.strip().lower():
             violations.append(f"Candidate name mismatch: '{tailored_resume.name}' vs '{base_resume.name}'")
 
+        # 5. Skills Non-Fabrication Check (Zero Hallucinated Technologies)
+        base_verified_corpus = set()
+        for cat_skills in (base_resume.skills or {}).values():
+            for s in cat_skills:
+                base_verified_corpus.add(s.strip().lower())
+                for sub in re.split(r"[/,()&|•]+", s):
+                    sub_clean = sub.strip().lower()
+                    if sub_clean:
+                        base_verified_corpus.add(sub_clean)
+
+        for exp in base_resume.experience:
+            for h in exp.highlights:
+                base_verified_corpus.add(h.strip().lower())
+            for t in getattr(exp, "technologies", []) or []:
+                base_verified_corpus.add(t.strip().lower())
+        for p in (base_resume.projects or []):
+            base_verified_corpus.add(p.name.strip().lower())
+            for t in (p.technologies or []):
+                base_verified_corpus.add(t.strip().lower())
+        for c in (base_resume.certifications or []):
+            base_verified_corpus.add(c.name.strip().lower())
+
+        base_raw_low = (
+            (base_resume.raw_text or "") + " " +
+            (base_resume.summary or "") + " " +
+            " ".join(base_verified_corpus)
+        ).lower()
+
+        fabricated_skills = []
+        for cat, s_list in (tailored_resume.skills or {}).items():
+            for s in s_list:
+                s_low = s.strip().lower()
+                is_grounded = (
+                    s_low in base_verified_corpus or
+                    bool(re.search(rf"\b{re.escape(s_low)}\b", base_raw_low))
+                )
+                if not is_grounded:
+                    fabricated_skills.append(s)
+
+        if fabricated_skills:
+            violations.append(f"Fabricated skill(s) detected not present in base resume: {fabricated_skills}")
+
         passed = len(violations) == 0
         score = 1.0 if passed else max(0.0, 1.0 - (0.35 * len(violations)))
-        msg = "All ground-truth employers, degrees, timelines, and identity verified 100% invariant." if passed else f"Truth Invariance violated with {len(violations)} defect(s)."
+        msg = "All ground-truth employers, degrees, timelines, skills, and identity verified 100% invariant." if passed else f"Truth Invariance violated with {len(violations)} defect(s)."
 
         return CheckpointResult(
             checkpoint_name="Truth Invariance Checkpoint",
@@ -99,7 +141,11 @@ class TruthInvarianceCheckpoint:
             score=round(score, 3),
             threshold=1.0,
             message=msg,
-            details={"violations": violations, "verified_companies": list(base_companies)},
+            details={
+                "violations": violations,
+                "verified_companies": list(base_companies),
+                "fabricated_skills": fabricated_skills,
+            },
         )
 
 
@@ -209,7 +255,8 @@ class CompetencyAlignmentCheckpoint:
         # 3. Composite alignment calculation
         normalized_match = min(1.0, calc_score / 100.0)
         composite = (0.55 * normalized_match) + (0.45 * kw_coverage)
-        threshold = 0.70
+        min_normalized = min(1.0, eval_case.minimum_match_score / 100.0)
+        threshold = max(0.40, min(0.70, (0.55 * min_normalized) + 0.30))
 
         passed = match_passed and (composite >= threshold or len(eval_case.required_keywords) == 0)
         msg = (

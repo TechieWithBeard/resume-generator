@@ -166,6 +166,80 @@ class TestEvaluationFramework(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_preflight_detects_low_match(self):
+        """Verifies preflight check identifies severe skill mismatch and returns is_low_match=True."""
+        from backend.app.services.generator_chain import generator_chain
+        mismatch_input = JobInput(
+            target_title="Senior Embedded Firmware Engineer",
+            job_description="Requires 5+ years of bare-metal C, FreeRTOS, ARM Cortex-M4, CAN bus, and PCB layout debugging.",
+        )
+        report = generator_chain.preflight_check(mismatch_input, self.base_resume)
+        self.assertTrue(report.is_low_match)
+        self.assertLess(report.match_score, 40)
+        self.assertIn("FreeRTOS", report.unmatched_skills)
+        self.assertTrue(len(report.direct_matches) == 0)
+
+    def test_truth_invariance_catches_fabricated_skills(self):
+        """Verifies TruthInvarianceCheckpoint catches unverified synthetic skills."""
+        rogue = self.base_resume.model_copy(deep=True)
+        rogue.skills["Embedded & Firmware"] = ["FreeRTOS", "ARM Cortex-M4", "CAN bus"]
+        result = TruthInvarianceCheckpoint.evaluate(
+            self.base_resume, rogue, self.sample_case
+        )
+        self.assertFalse(result.passed)
+        self.assertTrue(any("Fabricated skill(s)" in v for v in result.details["violations"]))
+
+    def test_strict_skills_non_fabrication_gate_purges_rogue_skills(self):
+        """Verifies Check 7 in generator_chain._verify_anti_hallucination purges unverified skills."""
+        from backend.app.services.generator_chain import generator_chain
+        rogue = self.base_resume.model_copy(deep=True)
+        rogue.skills["Fabricated"] = ["Swift", "FreeRTOS", "Golang"]
+        verified, audit = generator_chain._verify_anti_hallucination(
+            self.base_resume, rogue, doc_type="resume"
+        )
+        check_7 = next(item for item in audit if item.check == "Strict Skills Non-Fabrication Gate")
+        self.assertEqual(check_7.status, "WARNING")
+        # Ensure rogue skills were purged from verified output
+        all_skills = [s.lower() for cat in verified.skills.values() for s in cat]
+        self.assertNotIn("freertos", all_skills)
+        self.assertNotIn("swift", all_skills)
+
+    def test_asgi_preflight_endpoint(self):
+        """Verifies POST /api/generate/preflight returns accurate preflight report via ASGI."""
+        async def run():
+            rec_pre = []
+            async def send_pre(msg):
+                rec_pre.append(msg)
+            payload = json.dumps({
+                "job_input": {
+                    "target_title": "Embedded Systems Engineer",
+                    "job_description": "C, FreeRTOS, ARM Cortex, CAN bus, logic analyzers",
+                }
+            }).encode("utf-8")
+            async def rec_body():
+                return {"type": "http.request", "body": payload, "more_body": False}
+
+            await app({"type": "http", "method": "POST", "path": "/api/generate/preflight", "headers": []}, rec_body, send_pre)
+            body_msg = next(m for m in rec_pre if m["type"] == "http.response.body")
+            data = json.loads(body_msg["body"].decode("utf-8"))
+            self.assertTrue(data["is_low_match"])
+            self.assertLess(data["match_score"], 40)
+            self.assertIn("unmatched_skills", data)
+        asyncio.run(run())
+
+    def test_evaluator_extreme_mismatch_hitl_case(self):
+        """Runs evaluator on case_extreme_mismatch_hitl and verifies all checkpoints pass without hallucination."""
+        async def run():
+            case = next(c for c in BENCHMARK_DATASET if c.id == "case_extreme_mismatch_hitl")
+            res = await evaluator.evaluate_case(case, base_resume=self.base_resume, config=LLMConfig(provider="heuristic"))
+            self.assertTrue(res.passed)
+            # Ensure Truth Invariance and Noise Elimination pass 100%
+            ti_cp = next(cp for cp in res.checkpoints if cp.checkpoint_name == "Truth Invariance Checkpoint")
+            self.assertTrue(ti_cp.passed, f"Truth Invariance failed: {ti_cp.message}")
+            ne_cp = next(cp for cp in res.checkpoints if cp.checkpoint_name == "Noise Elimination Checkpoint")
+            self.assertTrue(ne_cp.passed, f"Noise Elimination failed: {ne_cp.message}")
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,16 +14,18 @@ An end-to-end, production-grade AI Resume & CV Platform that tailors candidate p
 
 ## 🌟 Key Highlights
 
+- **Human-in-the-Loop (HITL) Mismatch Workflow**: Fast preflight evaluation (`POST /api/generate/preflight`) detects severe competency mismatches ($<40\%$ match or extensive unverified requirements) without artificial score inflation. Prompts candidates with an interactive modal to choose an alignment strategy (`Transferable Skills` vs. `Strict Factual`) or update their Source of Truth before synthesis begins.
+- **Check 7: Strict Skills Non-Fabrication Gate**: Deterministic anti-hallucination verification scans every skill in `generated.skills` against candidate ground truth (`skills`, `experience`, `projects`, `certifications`, `raw_text`, `summary`) and automatically purges any ungrounded technical competencies (e.g. FreeRTOS, Swift, Go, Kubernetes if not in source).
 - **Strict 1–2 Page Hard Cap (No 30+ Page Overflow)**: Engineered 2-column layout (matching Enhancv / NovoResume) that compresses vertical height by ~45%, keeping resumes strictly within 1 to 2 pages with vector-sharp print boundaries.
 - **Built-in 9-Dimension Resume Score Checker**: Automated ATS quality audit evaluating Customization, Spelling & Grammar, Summary Statement, Measurable Results, Word Choice, Formatting, Optimal Length, Contact Info, and Comprehensiveness.
-- **Zero-Hallucination Ground Truth Invariant**: Programmatic verification guarantees 100% invariance for past employers, job titles, employment dates, degrees, and academic institutions.
+- **Zero-Hallucination Ground Truth Invariant**: Programmatic verification guarantees 100% invariance for past employers, job titles, employment dates, degrees, academic institutions, and technical skills.
 - **Dual-Mode Output (Resume vs. Strategic CV)**:
   - **ATS Resume**: High-density, quantified metric-rich experience bullets tailored to job requirements.
   - **Curriculum Vitae & Statement of Strategic Alignment**: 1–2 page executive letter articulating motivation and strategic fit backed by real-time company research.
 - **Company Research Intelligence**: Integrates real-time web search (DuckDuckGo / Tavily via LangChain) to discover company culture, engineering values, and tech stack nuances.
 - **Anti-Recruitment-Noise Guardrail**: Explicit filter strips out HR boilerplate, hiring process timelines ("call with recruiter 30 mins", "technical review at office", etc.) from both research and generated documents.
 - **Git-Style Diff Viewer**: Interactive side-by-side or inline diff viewer highlighting exactly which bullet points and skills were customized.
-- **Automated Evaluation Suite with 5 Checkpoints**: Continuous evaluation engine with automated scoring across Truth Invariance, Noise Elimination, Competency Alignment, ATS Formatting, and Company Research Intelligence.
+- **Automated Evaluation Suite with 5 Checkpoints & 6 Benchmarks**: Continuous evaluation engine with automated scoring across Truth Invariance, Noise Elimination, Competency Alignment, ATS Formatting, and Company Research Intelligence across 6 diverse real-world and adversarial test scenarios.
 
 ---
 
@@ -32,27 +34,28 @@ An end-to-end, production-grade AI Resume & CV Platform that tailors candidate p
 ```
 +---------------------------------------------------------------------------------------------------+
 |                                      FRONTEND (Angular 22 + Signals)                              |
-|  [ Job Spec / Target Title ]  [ Template Studio ]  [ Git-Diff Viewer ]  [ Source of Truth Editor ] |
+|  [ Job Spec / Target Title ]  [ HITL Mismatch Modal ]  [ Template Studio ]  [ Source of Truth ]    |
 +---------------------------------------------------------------------------------------------------+
-                                                  │
-                                 POST /api/generate/stream (SSE)
-                                                  ▼
+                             │                                              │
+             POST /api/generate/preflight (JSON)              POST /api/generate/stream (SSE)
+                             ▼                                              ▼
 +---------------------------------------------------------------------------------------------------+
 |                                   BACKEND ENGINE (FastAPI / ASGI)                                 |
 |                                                                                                   |
+|  0. Preflight Audit Gate        Honest match evaluation & HITL mismatch resolution trigger        |
 |  1. Company Research Tool       LangChain DuckDuckGo / Tavily search with noise suppression       |
 |  2. Job Deconstruction         Extracts essential skills, responsibilities & strategic focus      |
 |  3. Ground Truth Invariant      Immutable candidate profile loaded from JSON store                |
-|  4. Synthesis & Alignment       Reframes verified achievements to job requirements                |
+|  4. Synthesis & Alignment       Reframes verified achievements incorporating candidate guidance   |
 |  5. Noise Elimination Filter    Deterministic purge of HR recruitment process boilerplate         |
-|  6. Deterministic Verifier      Asserts 100% identity, employer, degree & timeline invariance     |
+|  6. 7-Check Verifier Gate       Asserts 100% identity, employer, degree, dates & skills grounding  |
 |  7. 9-Dimension Score Checker   Audits resume against official MyPerfectResume rubric             |
 |  8. Template Engine             Renders responsive 2-column ATS HTML with @media print rules      |
 +---------------------------------------------------------------------------------------------------+
                                                   │
                                                   ▼
 +---------------------------------------------------------------------------------------------------+
-|                                   EVALUATION SUITE (5 Checkpoints)                                |
+|                                   EVALUATION SUITE (6 Benchmark Cases)                            |
 |  [ Truth Invariance ] [ Noise Elimination ] [ Competency Match ] [ ATS Format ] [ Research Intel ]|
 +---------------------------------------------------------------------------------------------------+
 ```
@@ -192,24 +195,40 @@ Template Studio provides instant one-click presets for common customizations:
 
 ---
 
-## 🚀 Quickstart
+## 🚀 Quickstart: Run in 1 Command
 
-### Option A: One-Command Local Startup (Recommended)
+Anyone can clone this repository and run the full stack with **one command**. Everything needed to run locally—including the AI model, local server, and frontend—is configured automatically.
+
+### Option A: Docker (Zero-Config, Self-Contained Ollama & Model Puller)
 
 ```bash
-./start.sh
+# Clone the repository
+git clone https://github.com/TechieWithBeard/resume-generator.git
+cd resume-generator
+
+# Start the full stack (Ollama + llama3.2 auto-download + Frontend + Backend)
+docker compose up --build
 ```
-This script activates the virtual environment, verifies the Angular production build, and launches the unified ASGI server on [http://localhost:8000](http://localhost:8000).
+Open **[http://localhost:8000](http://localhost:8000)**.
+- **Automated Ollama Provisioning**: Automatically downloads, starts, and caches `llama3.2` without manual host setup.
+- **Model Customization**: To use a different model (e.g. `mistral` or `llama3.1:8b`):
+  `OLLAMA_MODEL=mistral docker compose up --build`
 
 ---
 
-### Option B: Docker / Docker Compose
+### Option B: Turnkey Host Launcher (`./setup.sh`)
+
+If you prefer running natively without Docker:
 
 ```bash
-# Build and start container
-docker compose up --build
+# Clone & run setup launcher
+git clone https://github.com/TechieWithBeard/resume-generator.git
+cd resume-generator
+./setup.sh
 ```
-Open [http://localhost:8000](http://localhost:8000).
+The script creates an isolated virtualenv, installs all backend requirements, compiles the Angular frontend, verifies Ollama, and opens your default browser at **[http://localhost:8000](http://localhost:8000)**.
+
+> 📖 For advanced configurations, environment variables, and GPU acceleration, read [INSTALLATION.md](INSTALLATION.md).
 
 ---
 
@@ -223,9 +242,8 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Run backend unit & integration tests
-PYTHONPATH=. python -m unittest backend/tests/test_backend.py
-PYTHONPATH=. python -m unittest backend/tests/test_e2e.py
+# Run backend test suite
+PYTHONPATH=. python -m unittest discover -s backend/tests -p "test_*.py" -v
 
 # Launch ASGI server
 python backend/run.py
@@ -268,37 +286,53 @@ Configurable via `.env` or interactively in the frontend **LLM Settings Drawer**
 
 ---
 
-## 🧪 Evaluation Suite & Checkpoints
+## 🧪 Evaluation Suite & Continuous Benchmarking
 
-The repository includes a standalone evaluation suite running 5 comprehensive benchmark test cases against 5 specialized checkpoints:
+The repository includes a standalone evaluation suite running 6 comprehensive benchmark test cases against 5 specialized checkpoints:
 
 ```bash
-# Run evaluations in terminal format
+# Run evaluations in terminal format across all 6 cases
 python backend/run_evals.py --format terminal
+
+# Run a specific benchmark case (e.g. extreme mismatch HITL)
+python backend/run_evals.py --case case_extreme_mismatch_hitl
 
 # Or output markdown summary
 python backend/run_evals.py --format markdown
 ```
 
-### Benchmark Results:
+### Benchmark Results (100.0% Pass Rate):
 ```
 ==============================================================================
   EVALUATION SUITE: Resume & CV Zero-Hallucination Alignment Benchmark
 ==============================================================================
-  Total Cases: 5 | Passed: 5 | Failed: 0 | Pass Rate: 100.0% | Average Score: 98.0%
+  Total Cases: 6 | Passed: 6 | Failed: 0 | Pass Rate: 100.0% | Average Score: 95.3%
 ------------------------------------------------------------------------------
   CATEGORY BENCHMARK SCORES:
   • Truth Invariance             [████████████████████] 100.0%
   • Noise Elimination            [████████████████████] 100.0%
-  • Competency Alignment         [██████████████████░░] 91.9%
+  • Competency Alignment         [████████████████░░░░] 81.2%
   • Ats Formatting               [████████████████████] 100.0%
   • Research Intelligence        [████████████████████] 100.0%
 ==============================================================================
 ```
 
+### The 6 Benchmark Scenarios:
+1. **Senior Frontend Architect (High Core Match)**: Validates high-density tailoring (97% match), quantifiable metric reframing, and ATS-tested 2-column rendering.
+2. **Fullstack Cloud Engineer (Cross-Domain Pivot & Transferable Skills)**: Verifies transferable skills reasoning for fullstack cloud platforms without fabricating unverified technologies (e.g. Golang or Kubernetes).
+3. **Adversarial Injection & Fake Credential Trap**: Injects deceptive prompts instructing the AI to fabricate MIT PhDs, Google Brain tenures, and recruitment interview schedules; asserts 100% rejection of synthetic facts.
+4. **Rentman Executive CV (Bespoke European Alignment)**: Validates Executive CV generation for Rentman in Utrecht, Netherlands: authentic web intelligence, Dutch enterprise client preservation (Maistering B.V.), and recruitment noise stripping.
+5. **Sparse Minimal Job Description**: Verifies graceful degradation and grounded synthesis when presented with a 1-sentence job posting without hallucinating out-of-scope technologies.
+6. **Senior Embedded Firmware Engineer (Extreme Mismatch & HITL Gate)**: Adversarial test case with zero overlap (bare-metal C, FreeRTOS, ARM Cortex, CAN bus). Verifies that preflight flags extreme mismatch ($5\%$ match), prompts Human-in-the-Loop guidance, and strictly purges unverified skills.
+
 ### The 5 Checkpoints:
-1. **Truth Invariance Checkpoint**: Verifies that 100% of candidate employers, degrees, timelines, and personal identity remain invariant.
-2. **Noise Elimination Checkpoint**: Flags and fails if any recruitment process boilerplate or interview schedules leak into generated documents.
+1. **Truth Invariance Checkpoint (Checks 1–5)**:
+   - *Check 1 (Employers)*: 100% invariance for past companies.
+   - *Check 2 (Education)*: 100% invariance for universities and degrees.
+   - *Check 3 (Timelines)*: 100% invariance for employment date spans.
+   - *Check 4 (Personal Identity)*: Name, phone, email, and location preserved verbatim.
+   - *Check 5 (Skills Non-Fabrication Gate)*: Asserts that zero synthetic technical competencies are added to the candidate's skill taxonomy.
+2. **Noise Elimination Checkpoint**: Flags and fails if any recruitment process boilerplate, phone screen duration, or interview schedules leak into generated documents.
 3. **Competency Alignment Checkpoint**: Asserts that core skills from the target job are woven naturally into verified achievements without keyword stuffing.
 4. **ATS & Template Formatting Checkpoint**: Asserts semantic HTML, visual dividers, proper `@page` margins, and incorporates the 9-Dimension Resume Score audit.
 5. **Company Research Intelligence Checkpoint**: Validates authentic strategic alignment, company mission research, and executive rationale in CV mode.

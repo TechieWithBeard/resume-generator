@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { ResumeGeneratorService } from '../../services/resume-generator.service';
 import { CardComponent } from '../../shared/components/card/card.component';
 import { GitDiffViewerComponent } from '../git-diff-viewer/git-diff-viewer.component';
+import { IframeHtmlDirective } from '../../shared/directives/iframe-html.directive';
 
 @Component({
   selector: 'app-resume-preview',
   standalone: true,
-  imports: [CommonModule, CardComponent, GitDiffViewerComponent],
+  imports: [CommonModule, CardComponent, GitDiffViewerComponent, IframeHtmlDirective],
   templateUrl: './resume-preview.component.html',
   styleUrl: './resume-preview.component.scss',
 })

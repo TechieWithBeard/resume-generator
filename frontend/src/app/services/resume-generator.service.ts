@@ -4,6 +4,7 @@ import {
   GeneratorStep,
   JobInput,
   LLMConfig,
+  PreflightReport,
   ResumeData,
   ResumeTemplate,
   TemplateConfig,
@@ -249,6 +250,7 @@ export class ResumeGeneratorService {
     if (active) {
       await this.renderResume(active, cfg.template_id || this.selectedTemplate(), this.comparisonMode());
     }
+    await this.renderBaseResume();
   }
 
   async renderPreviewWithConfig(resume: ResumeData, templateId: string, cfg: TemplateConfig): Promise<string> {
@@ -398,6 +400,32 @@ export class ResumeGeneratorService {
     } catch (err: any) {
       return { success: false, error: err.message || 'Network connection failed' };
     }
+  }
+
+  /**
+   * Fast preflight evaluation to detect role/competency mismatch before generation begins.
+   */
+  async checkPreflight(jobInput: JobInput): Promise<PreflightReport | null> {
+    try {
+      const enrichedInput: JobInput = {
+        ...jobInput,
+        document_type: jobInput.document_type || this.documentMode(),
+      };
+      const res = await fetch(`${this.API_BASE}/api/generate/preflight`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          job_input: enrichedInput,
+          base_resume: this.baseResume(),
+        }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn('Preflight check failed, proceeding to direct generation:', err);
+    }
+    return null;
   }
 
   /**

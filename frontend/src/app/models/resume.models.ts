@@ -47,6 +47,7 @@ export interface ResumeData {
   phone?: string;
   linkedin?: string;
   github?: string;
+  portfolio?: string;
   summary: string;
   availability?: Availability;
   experience: ExperienceItem[];
@@ -66,11 +67,19 @@ export interface ResumeData {
 }
 
 
+export interface HumanGuidance {
+  strategy: 'transferable' | 'strict' | 'strict_factual';
+  notes?: string;
+  candidate_notes?: string;
+  confirmed_proceed?: boolean;
+}
+
 export interface JobInput {
   job_description?: string;
   linkedin_url?: string;
   target_title?: string;
   document_type?: 'resume' | 'cv';
+  human_guidance?: HumanGuidance;
 }
 
 
@@ -90,6 +99,7 @@ export interface AlignmentAuditItem {
 
 export interface AlignmentReport {
   match_score: number;
+  is_low_match?: boolean;
   target_role: string;
   direct_matches: string[];
   transferable_skills: string[];
@@ -97,6 +107,16 @@ export interface AlignmentReport {
   alignment_strategy: string;
   anti_hallucination_audit: AlignmentAuditItem[];
   overall_status: 'PASSED' | 'REJECTED';
+}
+
+export interface PreflightReport {
+  match_score: number;
+  is_low_match: boolean;
+  target_role: string;
+  direct_matches: string[];
+  unmatched_skills: string[];
+  transferable_skills: string[];
+  message: string;
 }
 
 export interface ThoughtLog {

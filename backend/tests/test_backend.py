@@ -283,6 +283,102 @@ class TestResumeGenerator(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_skills_preservation_and_zero_synthetic_additions(self):
+        """Verifies skills are never dropped and empty certifications in base stay empty."""
+        # Test 1: Pydantic normalizes list of skills into category dict
+        raw_payload = {
+            "name": "Vishnu",
+            "title": "Senior Frontend Engineer",
+            "summary": "Proven track record in frontend systems.",
+            "skills": ["Angular", "TypeScript", "Signals", "Nx"],
+            "certifications": [],
+            "experience": [
+                {
+                    "role": "Senior Engineer",
+                    "company": "Parnasoft Technologies — Client: AVEVA",
+                    "period": "2025 - Present",
+                    "highlights": ["Built apps"]
+                }
+            ]
+        }
+        res_obj = ResumeData.model_validate(raw_payload)
+        self.assertIn("Technical Skills", res_obj.skills)
+        self.assertEqual(res_obj.skills["Technical Skills"], ["Angular", "TypeScript", "Signals", "Nx"])
+
+        # Test 2: _verify_anti_hallucination restores skills if generated skills are empty
+        empty_skills_gen = res_obj.model_copy(deep=True)
+        empty_skills_gen.skills = {}
+        empty_skills_gen.certifications = [
+            {"name": "Fake Azure 204", "issuer": "Microsoft", "year": "2023"}
+        ]
+        verified, audit = generator_chain._verify_anti_hallucination(self.sample_base, empty_skills_gen)
+        # Skills should be restored from self.sample_base
+        self.assertTrue(len(verified.skills) > 0)
+        self.assertIn("frontend", verified.skills)
+        # Fake certifications should be wiped because self.sample_base.certifications is empty
+        self.assertEqual(len(verified.certifications), 0)
+
+        # Test 3: Template engine rendering fallback to base_resume when skills empty
+        html = template_engine.render(empty_skills_gen, base_resume=self.sample_base)
+        self.assertIn("SKILLS", html)
+        self.assertIn("Angular", html)
+        self.assertNotIn("CERTIFICATIONS", html)
+
+    def test_contact_url_normalization_and_portfolio_support(self):
+        """Verifies LinkedIn, GitHub, and Portfolio URLs are normalized, never resolve locally, and render concurrently."""
+        # 1. Test helper URL normalization
+        href, label = template_engine._format_url("linkedin/vishnu-thankappan", "linkedin")
+        self.assertEqual(href, "https://www.linkedin.com/in/vishnu-thankappan")
+        self.assertEqual(label, "linkedin.com/in/vishnu-thankappan")
+
+        href, label = template_engine._format_url("https://www.linkedin.com/in/vishnu-thankappan-7bbb0675/", "linkedin")
+        self.assertEqual(href, "https://www.linkedin.com/in/vishnu-thankappan-7bbb0675")
+        self.assertEqual(label, "linkedin.com/in/vishnu-thankappan-7bbb0675")
+
+        href, label = template_engine._format_url("github/TechieWithBeard", "github")
+        self.assertEqual(href, "https://github.com/TechieWithBeard")
+        self.assertEqual(label, "github.com/TechieWithBeard")
+
+        href, label = template_engine._format_url("techiewithbeard.dev", "portfolio")
+        self.assertEqual(href, "https://techiewithbeard.dev")
+        self.assertEqual(label, "techiewithbeard.dev")
+
+        # 2. Test ResumeData model with portfolio
+        resume = ResumeData(
+            name="Vishnu Thankappan",
+            title="Senior Frontend Engineer",
+            summary="Experienced engineer.",
+            linkedin="linkedin/vishnu-thankappan",
+            github="https://github.com/TechieWithBeard",
+            portfolio="https://techiewithbeard.dev",
+            skills={"Frontend": ["Angular", "TypeScript"]},
+        )
+        self.assertEqual(resume.portfolio, "https://techiewithbeard.dev")
+
+        # 3. Test modern template rendering has both LinkedIn, GitHub, and Portfolio
+        html_modern = template_engine.render(resume, template_id="modern")
+        self.assertIn('href="https://www.linkedin.com/in/vishnu-thankappan"', html_modern)
+        self.assertIn('href="https://github.com/TechieWithBeard"', html_modern)
+        self.assertIn('href="https://techiewithbeard.dev"', html_modern)
+        self.assertIn('target="_blank"', html_modern)
+        self.assertIn('rel="noopener noreferrer"', html_modern)
+        self.assertNotIn('href="linkedin/', html_modern)
+
+        # 4. Test executive template rendering
+        html_exec = template_engine.render(resume, template_id="executive")
+        self.assertIn('href="https://www.linkedin.com/in/vishnu-thankappan"', html_exec)
+        self.assertIn('href="https://github.com/TechieWithBeard"', html_exec)
+        self.assertIn('href="https://techiewithbeard.dev"', html_exec)
+        self.assertNotIn('href="linkedin/', html_exec)
+
+        # 5. Test CV executive template rendering
+        html_cv = template_engine.render(resume, template_id="cv_executive")
+        self.assertIn('href="https://www.linkedin.com/in/vishnu-thankappan"', html_cv)
+        self.assertIn('href="https://github.com/TechieWithBeard"', html_cv)
+        self.assertIn('href="https://techiewithbeard.dev"', html_cv)
+        self.assertIn("Portfolio", html_cv)
+        self.assertNotIn('href="linkedin/', html_cv)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ResumeGeneratorService } from '../../services/resume-generator.service';
 import { CardComponent } from '../../shared/components/card/card.component';
+import { HumanGuidance, PreflightReport } from '../../models/resume.models';
 
 @Component({
   selector: 'app-job-input',
@@ -19,21 +20,41 @@ export class JobInputComponent {
   readonly extractMessage = signal<string | null>(null);
   readonly extractIsError = signal<boolean>(false);
 
+  // Human-in-the-Loop Mismatch Guidance Signals
+  readonly isCheckingPreflight = signal<boolean>(false);
+  readonly showMismatchModal = signal<boolean>(false);
+  readonly preflightReport = signal<PreflightReport | null>(null);
+  readonly selectedStrategy = signal<'transferable' | 'strict_factual'>('transferable');
+  readonly candidateNotes = signal<string>('');
+
   linkedinUrl = '';
   jobDescription = '';
   targetTitle = '';
 
   readonly isStreaming = this.resumeService.isStreaming;
   readonly documentMode = this.resumeService.documentMode;
+  readonly baseResume = this.resumeService.baseResume;
 
   setDocumentMode(mode: 'resume' | 'cv'): void {
     this.resumeService.setDocumentMode(mode);
   }
 
-  canGenerate(): boolean {
+  hasBaseResume(): boolean {
+    const base = this.baseResume();
+    return Boolean(base && base.name && base.experience && base.experience.length > 0);
+  }
+
+  hasJobRequirements(): boolean {
     return Boolean((this.jobDescription && this.jobDescription.trim().length > 30) || this.linkedinUrl);
   }
 
+  canGenerate(): boolean {
+    return this.hasBaseResume() && this.hasJobRequirements();
+  }
+
+  openSourceOfTruthModal(): void {
+    this.resumeService.showBaseResumeModal.set(true);
+  }
 
   async onExtractLinkedIn(): Promise<void> {
     if (!this.linkedinUrl) return;
@@ -56,32 +77,54 @@ export class JobInputComponent {
     }
   }
 
-  loadSampleJob(): void {
-    this.targetTitle = 'Senior Frontend Architect (Enterprise & AI)';
-    this.jobDescription = `Position: Senior Frontend Architect
-Location: Global / Remote
-Company: Enterprise AI SaaS Platform
+  async onGenerate(): Promise<void> {
+    if (!this.hasBaseResume()) {
+      this.openSourceOfTruthModal();
+      return;
+    }
+    if (!this.hasJobRequirements()) return;
 
-We are seeking a Senior Frontend Architect to lead the evolution of our high-scale enterprise web applications. You will be responsible for defining architectural standards, guiding Nx monorepo restructuring, establishing design system guidelines, and architecting real-time streaming AI interfaces.
+    const jobInput = {
+      job_description: this.jobDescription,
+      linkedin_url: this.linkedinUrl,
+      target_title: this.targetTitle || undefined,
+      document_type: this.documentMode(),
+    };
 
-Key Qualifications:
-• 7+ years of experience with Angular, TypeScript, and modern component architecture.
-• Proven mastery of Angular Signals, RxJS, and scalable state management.
-• Deep expertise in Nx monorepos, modular library boundaries, and CI/CD optimization.
-• Experience building real-time streaming interfaces (Server-Sent Events, WebSockets, LangChain).
-• Dedication to test coverage (Karma, Cypress, Playwright) and WCAG 2.1 accessibility.
-• Track record leading legacy modernization migrations in enterprise environments.`;
-    this.activeTab.set('text');
+    // Run Preflight Check to detect role mismatch
+    this.isCheckingPreflight.set(true);
+    const preflight = await this.resumeService.checkPreflight(jobInput);
+    this.isCheckingPreflight.set(false);
+
+    if (preflight && preflight.is_low_match) {
+      // Severe or low competency match detected: trigger Human-in-the-Loop decision modal
+      this.preflightReport.set(preflight);
+      this.showMismatchModal.set(true);
+      return;
+    }
+
+    // High/moderate alignment: proceed directly
+    this.resumeService.startGeneration(jobInput);
   }
 
-  onGenerate(): void {
-    if (!this.canGenerate()) return;
+  confirmMismatchProceed(): void {
+    const guidance: HumanGuidance = {
+      strategy: this.selectedStrategy(),
+      candidate_notes: this.candidateNotes().trim() || undefined,
+      confirmed_proceed: true,
+    };
+
+    this.showMismatchModal.set(false);
     this.resumeService.startGeneration({
       job_description: this.jobDescription,
       linkedin_url: this.linkedinUrl,
       target_title: this.targetTitle || undefined,
       document_type: this.documentMode(),
+      human_guidance: guidance,
     });
   }
 
+  cancelMismatch(): void {
+    this.showMismatchModal.set(false);
+  }
 }

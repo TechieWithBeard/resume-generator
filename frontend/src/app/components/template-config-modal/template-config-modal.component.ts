@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ResumeGeneratorService } from '../../services/resume-generator.service';
 import { TemplateConfig } from '../../models/resume.models';
 import { ModalComponent } from '../../shared/components/modal/modal.component';
+import { IframeHtmlDirective } from '../../shared/directives/iframe-html.directive';
 
 export interface ColorPalette {
   name: string;
@@ -41,7 +42,7 @@ export interface QuickSnippet {
 @Component({
   selector: 'app-template-config-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalComponent],
+  imports: [CommonModule, FormsModule, ModalComponent, IframeHtmlDirective],
   templateUrl: './template-config-modal.component.html',
   styleUrl: './template-config-modal.component.scss',
 })
@@ -175,6 +176,26 @@ export class TemplateConfigModalComponent {
     this.refreshPreview(0);
   }
 
+  setDensity(density: 'compact' | 'normal' | 'comfortable'): void {
+    const fontSizeMap: Record<'compact' | 'normal' | 'comfortable', string> = {
+      compact: '10.5px',
+      normal: '11.5px',
+      comfortable: '12.5px',
+    };
+    const lineHeightMap: Record<'compact' | 'normal' | 'comfortable', string> = {
+      compact: '1.25',
+      normal: '1.36',
+      comfortable: '1.50',
+    };
+    this.draftConfig.update((cfg) => ({
+      ...cfg,
+      density,
+      font_size: fontSizeMap[density],
+      line_height: lineHeightMap[density],
+    }));
+    this.refreshPreview(0);
+  }
+
   onSelectTemplate(tmplId: string): void {
     this.updateField('template_id', tmplId, 0);
   }
@@ -205,6 +226,18 @@ export class TemplateConfigModalComponent {
         const html = await this.resumeService.renderPreviewWithConfig(resume, tmplId, cfg);
         if (reqId === this.renderRequestId) {
           this.previewHtml.set(html);
+          setTimeout(() => {
+            const iframe = document.querySelector('iframe[title="Live Template Preview"]') as HTMLIFrameElement;
+            if (iframe) {
+              const doc = iframe.contentDocument || iframe.contentWindow?.document;
+              if (doc && doc.body) {
+                const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
+                if (h > 0) {
+                  iframe.style.height = `${h + 30}px`;
+                }
+              }
+            }
+          }, 150);
         }
       } catch (err) {
         console.error('Failed to render template customizer preview:', err);

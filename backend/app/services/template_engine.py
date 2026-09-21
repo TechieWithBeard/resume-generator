@@ -55,53 +55,183 @@ class TemplateEngine:
         if not config:
             return ""
         
-        density = config.density
+        density = config.density or "normal"
         if density == "compact":
             padding = "28px 36px"
-            section_margin = "10px"
-            item_margin = "7px"
+            section_margin = "8px"
+            item_margin = "5px"
             bullet_margin = "1px"
-            line_height = config.line_height or "1.30"
+            default_lh = "1.25"
+            default_fs = "10.5px"
         elif density == "comfortable":
             padding = "54px 58px"
-            section_margin = "18px"
+            section_margin = "20px"
             item_margin = "14px"
-            bullet_margin = "4px"
-            line_height = config.line_height or "1.48"
+            bullet_margin = "5px"
+            default_lh = "1.50"
+            default_fs = "12.5px"
         else: # normal
             padding = "34px 40px"
             section_margin = "13px"
-            item_margin = "10px"
-            bullet_margin = "2px"
-            line_height = config.line_height or "1.36"
+            item_margin = "9px"
+            bullet_margin = "2.5px"
+            default_lh = "1.36"
+            default_fs = "11.5px"
 
-        header_css = ""
-        if config.header_layout == "center":
+        # Explicit user selection overrides density preset
+        if config.line_height and config.line_height not in ("1.36", ""):
+            line_height = config.line_height
+        else:
+            line_height = default_lh
+
+        if config.font_size and config.font_size not in ("11.5px", ""):
+            font_size = config.font_size
+        else:
+            font_size = default_fs
+
+        header_layout = config.header_layout or "left"
+        if header_layout == "center":
             header_css = """
-            .header { text-align: center !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
-            .header-info, .name, h1, .title-tagline { text-align: center !important; width: 100% !important; }
-            .contacts { justify-content: center !important; text-align: center !important; display: flex !important; flex-wrap: wrap !important; gap: 10px !important; margin-top: 6px !important; width: 100% !important; }
+            .header {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                text-align: center !important;
+                margin-bottom: 14px !important;
+                width: 100% !important;
+            }
+            .header-info, .header-top-row {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                text-align: center !important;
+                width: 100% !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+            }
+            .name, h1, .title-tagline {
+                text-align: center !important;
+                width: 100% !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+            }
+            .header-doc-type {
+                margin-top: 4px !important;
+                display: inline-block !important;
+            }
+            .contacts {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                justify-content: center !important;
+                align-items: center !important;
+                text-align: center !important;
+                gap: 8px 14px !important;
+                margin-top: 6px !important;
+                width: 100% !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+            }
+            .contact-item {
+                justify-content: center !important;
+                text-align: center !important;
+            }
             """
-        elif config.header_layout == "split":
+        elif header_layout == "split":
             header_css = """
-            .header { display: flex !important; justify-content: space-between !important; align-items: flex-end !important; flex-wrap: wrap !important; gap: 12px !important; text-align: left !important; }
-            .header-info { text-align: left !important; min-width: 0 !important; }
-            .name, h1, .title-tagline { text-align: left !important; }
-            .contacts { text-align: right !important; justify-content: flex-end !important; display: flex !important; flex-wrap: wrap !important; gap: 10px !important; max-width: 55% !important; }
+            .header {
+                display: flex !important;
+                flex-direction: row !important;
+                justify-content: space-between !important;
+                align-items: flex-start !important;
+                flex-wrap: nowrap !important;
+                gap: 16px !important;
+                margin-bottom: 14px !important;
+                text-align: left !important;
+                width: 100% !important;
+            }
+            .header-info {
+                flex: 1 1 auto !important;
+                text-align: left !important;
+                min-width: 0 !important;
+            }
+            .header-top-row {
+                display: flex !important;
+                justify-content: flex-start !important;
+                align-items: baseline !important;
+                gap: 10px !important;
+                flex-wrap: wrap !important;
+            }
+            .name, h1, .title-tagline {
+                text-align: left !important;
+                margin-left: 0 !important;
+            }
+            .contacts {
+                flex: 0 1 auto !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-end !important;
+                justify-content: flex-start !important;
+                text-align: right !important;
+                gap: 3px !important;
+                min-width: 220px !important;
+                max-width: 50% !important;
+                margin-top: 2px !important;
+                border-bottom: none !important;
+                padding-bottom: 0 !important;
+                margin-bottom: 0 !important;
+            }
+            .contact-item {
+                justify-content: flex-end !important;
+                text-align: right !important;
+            }
             """
-        elif config.header_layout == "left":
+        else: # left
             header_css = """
-            .header { text-align: left !important; display: block !important; }
-            .header-info, .name, h1, .title-tagline { text-align: left !important; }
-            .contacts { justify-content: flex-start !important; text-align: left !important; display: flex !important; flex-wrap: wrap !important; gap: 10px !important; margin-top: 6px !important; }
+            .header {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                text-align: left !important;
+                margin-bottom: 14px !important;
+                width: 100% !important;
+            }
+            .header-info {
+                text-align: left !important;
+                width: 100% !important;
+            }
+            .header-top-row {
+                display: flex !important;
+                justify-content: flex-start !important;
+                align-items: baseline !important;
+                gap: 10px !important;
+                flex-wrap: wrap !important;
+            }
+            .name, h1, .title-tagline {
+                text-align: left !important;
+                margin-left: 0 !important;
+            }
+            .contacts {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                justify-content: flex-start !important;
+                align-items: center !important;
+                text-align: left !important;
+                gap: 8px 14px !important;
+                margin-top: 6px !important;
+                width: 100% !important;
+            }
+            .contact-item {
+                justify-content: flex-start !important;
+                text-align: left !important;
+            }
             """
 
-        font_size = config.font_size or "11.5px"
         return f"""
         /* User Configured Dynamic Overrides */
         :root {{
             --primary-color: {config.primary_color} !important;
             --accent-color: {config.accent_color} !important;
+            --accent-light: {config.accent_color} !important;
             --text-primary: {config.text_color} !important;
             --font-family: {config.font_family} !important;
             --font-size: {font_size} !important;
@@ -118,33 +248,41 @@ class TemplateEngine:
             line-height: var(--line-height) !important;
             font-size: var(--font-size) !important;
         }}
-        p, li, .summary-text, .exp-highlights, .project-highlights, .contacts, .side-entry-sub, .side-entry-meta {{
+        p, li, .summary-text, .exp-highlights, .project-highlights, .contacts, .side-entry-sub, .side-entry-meta, .letter-text, .entry-bullets li {{
             font-size: var(--font-size) !important;
             line-height: var(--line-height) !important;
         }}
         .name, h1 {{
             color: var(--primary-color) !important;
-            font-size: calc(var(--font-size) * 2.3) !important;
+            font-size: calc(var(--font-size) * 2.1) !important;
             line-height: 1.15 !important;
         }}
         .sec-heading, .section-title, .cv-section-title, .cv-section-title-alt {{
             color: var(--primary-color) !important;
             border-bottom-color: var(--primary-color) !important;
-            font-size: calc(var(--font-size) * 1.2) !important;
+            font-size: calc(var(--font-size) * 1.18) !important;
         }}
-        .exp-role, .project-name, .cv-project-title {{
+        .exp-role, .project-name, .cv-project-title, .scope-title, .addressee-to, .subject-line, .signoff-name, .competency-title, .side-entry-title {{
             color: var(--primary-color) !important;
-            font-size: calc(var(--font-size) * 1.1) !important;
         }}
-        .title-tagline, .title, .exp-company, .cv-project-role, .edu-degree, .target-company, .skill-label {{
+        .title-tagline, .title, .exp-company, .cv-project-role, .scope-company, .edu-degree, .target-company, .skill-label, .addressee-company, .subject-role, .signoff-title, .case-study-role {{
             color: var(--accent-color) !important;
         }}
-        a, .contacts a, .proj-link {{
+        a, .contacts a, .proj-link, .entry-link {{
             color: var(--accent-color) !important;
         }}
-        .cv-badge, .badge, .tag-primary {{
+        .target-badge, .badge, .tag-primary {{
             background-color: var(--primary-color) !important;
             color: #ffffff !important;
+        }}
+        .cv-target-banner, .cv-letter-box {{
+            border-left-color: var(--primary-color) !important;
+        }}
+        .role-scope-box {{
+            border-left-color: var(--accent-color) !important;
+        }}
+        .paper, .resume-paper {{
+            border-top-color: var(--primary-color) !important;
         }}
         @media screen {{
             body {{
@@ -178,21 +316,72 @@ class TemplateEngine:
                 width: 100% !important;
             }}
         }}
-        .section, .cv-section {{
+        .section, .cv-section, .cv-addressee-block, .cv-target-banner, .cv-intel-box, .cv-signoff-block {{
             margin-bottom: {section_margin} !important;
         }}
-        .experience-entry, .project-card, .project-entry, .cv-project-card, .education-entry, .edu-item, .cv-entry, .cert-entry, .side-entry {{
+        .experience-entry, .project-card, .project-entry, .cv-project-card, .education-entry, .edu-item, .cv-entry, .cert-entry, .side-entry, .cv-scope-item, .cv-letter-box {{
             margin-bottom: {item_margin} !important;
         }}
-        .exp-highlights li, .project-highlights li {{
+        .exp-highlights li, .project-highlights li, .entry-bullets li {{
             margin-bottom: {bullet_margin} !important;
         }}
         {header_css}
         {config.custom_css or ""}
         """
 
+    def _format_url(self, url: Optional[str], platform: str = "") -> Tuple[str, str]:
+        """
+        Returns (href, display_label).
+        Ensures href is always an absolute URL with scheme (http:// or https://)
+        so browsers never resolve it as a relative path against localhost.
+        """
+        if not url:
+            return ("", "")
+        raw = str(url).strip()
+        if not raw:
+            return ("", "")
+
+        platform_lower = platform.lower()
+        raw_lower = raw.lower()
+
+        # Normalization for LinkedIn
+        if platform_lower == "linkedin" or "linkedin.com" in raw_lower or raw_lower.startswith("linkedin/"):
+            clean = raw
+            clean = re.sub(r"^https?://(www\.)?linkedin\.com/in/", "", clean, flags=re.IGNORECASE)
+            clean = re.sub(r"^https?://(www\.)?linkedin\.com/", "", clean, flags=re.IGNORECASE)
+            clean = re.sub(r"^linkedin/in/", "", clean, flags=re.IGNORECASE)
+            clean = re.sub(r"^linkedin/", "", clean, flags=re.IGNORECASE)
+            clean = clean.strip("/")
+            href = f"https://www.linkedin.com/in/{clean}" if clean else "https://www.linkedin.com"
+            label = f"linkedin.com/in/{clean}" if clean else "LinkedIn"
+            return (href, label)
+
+        # Normalization for GitHub
+        if platform_lower == "github" or "github.com" in raw_lower or raw_lower.startswith("github/"):
+            clean = raw
+            clean = re.sub(r"^https?://(www\.)?github\.com/", "", clean, flags=re.IGNORECASE)
+            clean = re.sub(r"^github/", "", clean, flags=re.IGNORECASE)
+            clean = clean.strip("/")
+            href = f"https://github.com/{clean}" if clean else "https://github.com"
+            label = f"github.com/{clean}" if clean else "GitHub"
+            return (href, label)
+
+        # General / Portfolio URL
+        href = raw
+        if not (href.startswith("http://") or href.startswith("https://")):
+            href = f"https://{href}"
+
+        # Clean display label
+        label = raw
+        label = re.sub(r"^https?://", "", label, flags=re.IGNORECASE)
+        label = re.sub(r"^www\.", "", label, flags=re.IGNORECASE)
+        label = label.rstrip("/")
+        if not label:
+            label = "Portfolio"
+        return (href, label)
+
     def highlight_target_terms(self, text: str, target_terms: Set[str]) -> str:
-        """Highlights matching target keywords in text."""
+        """Highlights matching target keywords cleanly without strikethroughs."""
         if not text or not target_terms:
             return text
         words = text.split()
@@ -212,66 +401,13 @@ class TemplateEngine:
         target_terms: Optional[Set[str]] = None,
     ) -> str:
         """
-        Computes word-level diff markup between base_text and new_text.
-        - Inserts <mark class="diff-text-added"> for added words.
-        - Inserts <mark class="diff-text-adapted"> for adapted/replaced words.
-        - Inserts <mark class="diff-kw-term"> for target keyword matches.
+        Subtly highlights customized keywords in new_text.
+        Never outputs strikethrough (<del>) text or plus/minus signs.
         """
         if not new_text:
             return ""
         target_terms = target_terms or set()
-
-        if base_text is None:
-            return self.highlight_target_terms(new_text, target_terms)
-        if base_text.strip() == new_text.strip():
-            return self.highlight_target_terms(new_text, target_terms)
-
-        base_words = base_text.split()
-        new_words = new_text.split()
-
-        matcher = difflib.SequenceMatcher(
-            None,
-            [w.lower() for w in base_words],
-            [w.lower() for w in new_words],
-        )
-
-        out_tokens = []
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            if tag == "equal":
-                for w in new_words[j1:j2]:
-                    w_clean = re.sub(r"[^\w\+\#]", "", w.lower())
-                    if w_clean in target_terms or any(t in w_clean for t in target_terms if len(t) > 3):
-                        out_tokens.append(f'<mark class="diff-kw-term">{w}</mark>')
-                    else:
-                        out_tokens.append(w)
-            elif tag == "replace":
-                del_chunk = " ".join(base_words[i1:i2])
-                sub_tokens = []
-                for w in new_words[j1:j2]:
-                    w_clean = re.sub(r"[^\w\+\#]", "", w.lower())
-                    if w_clean in target_terms or any(t in w_clean for t in target_terms if len(t) > 3):
-                        sub_tokens.append(f'<strong class="diff-kw-match">{w}</strong>')
-                    else:
-                        sub_tokens.append(w)
-                ins_chunk = " ".join(sub_tokens)
-                del_html = f'<del class="git-diff-del"><span class="diff-sign">-</span>{del_chunk}</del>'
-                ins_html = f'<ins class="git-diff-ins diff-text-adapted"><span class="diff-sign">+</span>{ins_chunk}</ins>'
-                out_tokens.append(f'{del_html} {ins_html}')
-            elif tag == "insert":
-                sub_tokens = []
-                for w in new_words[j1:j2]:
-                    w_clean = re.sub(r"[^\w\+\#]", "", w.lower())
-                    if w_clean in target_terms or any(t in w_clean for t in target_terms if len(t) > 3):
-                        sub_tokens.append(f'<strong class="diff-kw-match">{w}</strong>')
-                    else:
-                        sub_tokens.append(w)
-                ins_chunk = " ".join(sub_tokens)
-                out_tokens.append(f'<ins class="git-diff-ins diff-text-added"><span class="diff-sign">+</span>{ins_chunk}</ins>')
-            elif tag == "delete":
-                del_chunk = " ".join(base_words[i1:i2])
-                out_tokens.append(f'<del class="git-diff-del"><span class="diff-sign">-</span>{del_chunk}</del>')
-
-        return " ".join(out_tokens)
+        return self.highlight_target_terms(new_text, target_terms)
 
     def diff_bullet(
         self,
@@ -280,29 +416,17 @@ class TemplateEngine:
         target_terms: Set[str],
     ) -> Tuple[str, bool, bool]:
         """
-        Compares a tailored bullet against base bullets to find closest match and highlight changes.
+        Compares a tailored bullet against base bullets.
         Returns: (highlighted_html, is_modified, has_target_kw)
+        Never outputs strikethrough (<del>) or plus/minus signs.
         """
         b_clean = bullet.strip().lower()
         base_clean_set = {b.strip().lower() for b in base_bullets}
         has_target_kw = any(kw in b_clean for kw in target_terms if len(kw) > 3)
+        is_modified = b_clean not in base_clean_set
 
-        if b_clean in base_clean_set:
-            return self.highlight_target_terms(bullet, target_terms), False, has_target_kw
-
-        closest = difflib.get_close_matches(bullet, base_bullets, n=1, cutoff=0.3)
-        if closest:
-            diffed = self.diff_text(bullet, closest[0], target_terms)
-            return diffed, True, has_target_kw
-
-        sub_tokens = []
-        for w in bullet.split():
-            w_clean = re.sub(r"[^\w\+\#]", "", w.lower())
-            if w_clean in target_terms or any(t in w_clean for t in target_terms if len(t) > 3):
-                sub_tokens.append(f'<strong class="diff-kw-match">{w}</strong>')
-            else:
-                sub_tokens.append(w)
-        return f'<ins class="git-diff-ins diff-text-added"><span class="diff-sign">+</span>{" ".join(sub_tokens)}</ins>', True, has_target_kw
+        highlighted = self.highlight_target_terms(bullet, target_terms)
+        return highlighted, is_modified, has_target_kw
 
     def render(
         self,
@@ -329,16 +453,16 @@ class TemplateEngine:
                 pass
 
         doc_type = getattr(resume, "document_type", "resume")
-        if config_passed and config and config.template_id and config.template_id != "modern":
+        if config_passed and config and config.template_id:
             effective_tmpl = config.template_id
-        elif template_id and template_id != "modern":
+        elif template_id:
             effective_tmpl = template_id
-        elif doc_type == "cv" and (not config_passed or (config and config.template_id == "cv_executive")):
+        elif doc_type == "cv":
             effective_tmpl = "cv_executive"
         elif config and config.template_id:
             effective_tmpl = config.template_id
         else:
-            effective_tmpl = template_id or "modern"
+            effective_tmpl = "modern"
 
         if effective_tmpl == "cv_executive":
             return self._render_cv_executive(resume, highlight_diff, base_resume, config=config)
@@ -393,19 +517,10 @@ class TemplateEngine:
         diff_legend_html = ""
         if highlight_diff:
             diff_legend_html = f"""
-            <div class="cv-diff-banner avoid-break" style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:10px 14px; margin-bottom:16px; font-size:8pt; color:#c9d1d9; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">
-                <div style="font-weight:700; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="background:#238636; color:#ffffff; font-size:7pt; font-weight:800; padding:2px 6px; border-radius:3px; letter-spacing:0.5px;">GIT DIFF</span>
-                        <span style="color:#58a6ff; font-weight:700;">DIFF VIEW ACTIVE: git diff base_profile &rarr; tailored_profile</span>
-                    </div>
-                    <span style="color:#8b949e; font-size:7.5pt;">origin/ground-truth &rarr; target/{target_role or "tailored"}</span>
-                </div>
-                <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:7.5pt;">
-                    <span style="background:#ffebe9; color:#cf222e; border:1px solid #ffc1ba; padding:1px 6px; border-radius:3px; font-weight:700;">🔴 - Removed from Base</span>
-                    <span style="background:#dafbe1; color:#116329; border:1px solid #86efac; padding:1px 6px; border-radius:3px; font-weight:700;">🟢 + Added / Tailored Profile</span>
-                    <span style="background:#ddf4ff; color:#0969da; border:1px solid #54aeff; padding:1px 6px; border-radius:3px; font-weight:700;">🔵 ★ Target Keyword Match</span>
-                    <span style="background:#21262d; color:#8b949e; border:1px solid #30363d; padding:1px 6px; border-radius:3px; font-weight:600;">⚪ Invariant Facts Preserved</span>
+            <div class="cv-diff-banner avoid-break" style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid var(--primary-color); border-radius:4px; padding:6px 12px; margin-bottom:12px; font-size:8pt; color:var(--text-primary);">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                    <span style="font-weight:700; color:var(--primary-color);">DIFF VIEW ACTIVE &bull; Showing customized keyword alignment for {target_role or "target role"}</span>
+                    <span style="font-size:7.5pt; color:var(--text-muted);">Tailored Profile</span>
                 </div>
             </div>
             """
@@ -429,6 +544,7 @@ class TemplateEngine:
         icon_loc = "📍 " if use_icons else ""
         icon_linkedin = "🔗 " if use_icons else ""
         icon_github = "💻 " if use_icons else ""
+        icon_portfolio = "🌐 " if use_icons else ""
 
         # Contact items
         contacts = []
@@ -436,10 +552,15 @@ class TemplateEngine:
             contacts.append(f'<span class="contact-item"><span class="contact-icon">{icon_phone}</span>{resume.phone}</span>')
         if resume.email:
             contacts.append(f'<span class="contact-item"><span class="contact-icon">{icon_email}</span>{resume.email}</span>')
+        if resume.linkedin:
+            l_href, l_label = self._format_url(resume.linkedin, "linkedin")
+            contacts.append(f'<a href="{l_href}" target="_blank" rel="noopener noreferrer" class="contact-item"><span class="contact-icon">{icon_linkedin}</span>{l_label}</a>')
         if resume.github:
-            contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item"><span class="contact-icon">{icon_github}</span>{resume.github}</a>')
-        elif resume.linkedin:
-            contacts.append(f'<a href="{resume.linkedin}" target="_blank" class="contact-item"><span class="contact-icon">{icon_linkedin}</span>{resume.linkedin}</a>')
+            g_href, g_label = self._format_url(resume.github, "github")
+            contacts.append(f'<a href="{g_href}" target="_blank" rel="noopener noreferrer" class="contact-item"><span class="contact-icon">{icon_github}</span>{g_label}</a>')
+        if getattr(resume, "portfolio", None):
+            p_href, p_label = self._format_url(resume.portfolio, "portfolio")
+            contacts.append(f'<a href="{p_href}" target="_blank" rel="noopener noreferrer" class="contact-item"><span class="contact-icon">{icon_portfolio}</span>{p_label}</a>')
         if resume.location:
             contacts.append(f'<span class="contact-item"><span class="contact-icon">{icon_loc}</span>{resume.location}</span>')
         contact_html = "".join(contacts)
@@ -468,20 +589,11 @@ class TemplateEngine:
             for h in exp.highlights:
                 if highlight_diff:
                     h_rendered, is_modified, has_target_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
-                    if is_modified:
-                        highlight_cls = "highlighted-bullet mod"
-                        bullet_badge = '<span class="diff-bullet-badge mod" style="background:#fde68a; color:#92400e; font-size:7pt; font-weight:800; padding:1px 4px; border-radius:2px; text-transform:uppercase; margin-right:4px;">+ Tailored</span> '
-                    elif has_target_kw:
-                        highlight_cls = "highlighted-bullet kw"
-                        bullet_badge = '<span class="diff-bullet-badge kw" style="background:#bae6fd; color:#0369a1; font-size:7pt; font-weight:800; padding:1px 4px; border-radius:2px; text-transform:uppercase; margin-right:4px;">★ Key Skill</span> '
-                    else:
-                        highlight_cls = ""
-                        bullet_badge = ""
+                    highlight_cls = "highlighted-bullet" if is_modified or has_target_kw else ""
                 else:
                     h_rendered = h
                     highlight_cls = ""
-                    bullet_badge = ""
-                bullets += f'<li class="{highlight_cls}">{bullet_badge}{h_rendered}</li>\n'
+                bullets += f'<li class="{highlight_cls}">{h_rendered}</li>\n'
             
             loc_str = f'&nbsp;&nbsp; <span class="meta-icon">📍</span> {exp.location}' if exp.location else ''
             exp_html += f"""
@@ -495,19 +607,20 @@ class TemplateEngine:
             </div>
             """
 
-        # Projects (Left Column, below Experience)
+        # Projects (Left Column, below Experience) - only rendered if legitimate projects exist
         projects_html = ""
         show_proj = config.show_projects if config is not None else True
-        if show_proj and getattr(resume, "projects", None):
+        valid_projects = [p for p in (getattr(resume, "projects", None) or []) if p.name and (p.description or p.role)]
+        if show_proj and valid_projects:
             p_entries = []
-            for proj in resume.projects:
-                url_link = f' <a href="{proj.url}" target="_blank" class="proj-link" title="Open Link">🔗</a>' if proj.url else ''
+            for proj in valid_projects:
+                url_link = f' <a href="{proj.url}" target="_blank" class="proj-link" title="Open Link">↗</a>' if proj.url and "github.com/TechieWithBeard" not in proj.url else ''
                 period_str = f'<div class="exp-meta"><span class="meta-icon">📅</span> {proj.period}</div>' if proj.period else ''
                 base_p_desc = base_projects_by_name.get(proj.name.strip().lower(), "")
                 rendered_p_desc = (
                     self.diff_text(proj.description, base_p_desc, target_terms)
                     if highlight_diff and proj.description
-                    else proj.description
+                    else (proj.description or "")
                 )
                 
                 # Split description into bullet points if multi-sentence
@@ -527,9 +640,7 @@ class TemplateEngine:
                     <div class="exp-role">{proj.name}{url_link}</div>
                     {tech_sub}
                     {period_str}
-                    <ul class="exp-highlights">
-                        {p_bullets}
-                    </ul>
+                    {f'<ul class="exp-highlights">{p_bullets}</ul>' if p_bullets else ''}
                 </div>
                 """)
 
@@ -566,10 +677,6 @@ class TemplateEngine:
         courses_items = []
         if getattr(resume, "additional_sections", None):
             courses_items = resume.additional_sections.get("training") or resume.additional_sections.get("courses") or []
-        if not courses_items and getattr(resume, "certifications", None):
-            for c in resume.certifications:
-                if "204" in c.name or "Course" in c.name or "Training" in c.name:
-                    courses_items.append(f"<strong>{c.name}</strong> - {c.issuer}")
         
         courses_html = ""
         if courses_items:
@@ -584,10 +691,14 @@ class TemplateEngine:
         # 3. Skills Pills
         seen_skills = set()
         skills_pills = []
-        for cat_name, skill_list in (resume.skills or {}).items():
+        source_skills = resume.skills
+        if (not source_skills or not any(source_skills.values())) and base_resume and base_resume.skills:
+            source_skills = base_resume.skills
+
+        for cat_name, skill_list in (source_skills or {}).items():
             for s in skill_list:
                 s_clean = s.strip()
-                if s_clean.lower() not in seen_skills:
+                if s_clean and s_clean.lower() not in seen_skills:
                     seen_skills.add(s_clean.lower())
                     is_matched = highlight_diff and (
                         s_clean.lower() in target_terms or any(t in s_clean.lower() for t in target_terms if len(t) > 3)
@@ -597,14 +708,16 @@ class TemplateEngine:
                     else:
                         skills_pills.append(f'<span class="skill-pill">{s_clean}</span>')
 
-        skills_html = f"""
-        <div class="section">
-            <div class="section-title" title="Technical Competencies">SKILLS <!-- Technical Competencies --></div>
-            <div class="skills-pill-grid">
-                {''.join(skills_pills)}
+        skills_html = ""
+        if skills_pills:
+            skills_html = f"""
+            <div class="section">
+                <div class="section-title" title="Technical Competencies">SKILLS <!-- Technical Competencies --></div>
+                <div class="skills-pill-grid">
+                    {''.join(skills_pills)}
+                </div>
             </div>
-        </div>
-        """
+            """
 
         # 4. Certifications
         cert_html = ""
@@ -1114,26 +1227,40 @@ class TemplateEngine:
         diff_legend_html = ""
         if highlight_diff:
             diff_legend_html = f"""
-            <div class="cv-diff-banner avoid-break" style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:10px 14px; margin-bottom:16px; font-size:8pt; color:#c9d1d9; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">
-                <div style="font-weight:700; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="background:#238636; color:#ffffff; font-size:7pt; font-weight:800; padding:2px 6px; border-radius:3px; letter-spacing:0.5px;">GIT DIFF</span>
-                        <span style="color:#58a6ff; font-weight:700;">DIFF VIEW ACTIVE: git diff base_profile &rarr; tailored_profile</span>
-                    </div>
-                    <span style="color:#8b949e; font-size:7.5pt;">origin/ground-truth &rarr; target/{target_role or "tailored"}</span>
-                </div>
-                <div style="display:flex; flex-wrap:gap; gap:8px; font-size:7.5pt;">
-                    <span style="background:#ffebe9; color:#cf222e; border:1px solid #ffc1ba; padding:1px 6px; border-radius:3px; font-weight:700;">🔴 - Removed from Base</span>
-                    <span style="background:#dafbe1; color:#116329; border:1px solid #86efac; padding:1px 6px; border-radius:3px; font-weight:700;">🟢 + Added / Tailored Profile</span>
-                    <span style="background:#ddf4ff; color:#0969da; border:1px solid #54aeff; padding:1px 6px; border-radius:3px; font-weight:700;">🔵 ★ Target Keyword Match</span>
-                    <span style="background:#21262d; color:#8b949e; border:1px solid #30363d; padding:1px 6px; border-radius:3px; font-weight:600;">⚪ Invariant Facts Preserved</span>
+            <div class="cv-diff-banner avoid-break" style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid var(--primary-color); border-radius:4px; padding:6px 12px; margin-bottom:12px; font-size:8pt; color:var(--text-primary);">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                    <span style="font-weight:700; color:var(--primary-color);">DIFF VIEW ACTIVE &bull; Showing customized keyword alignment for {target_role or "target role"}</span>
+                    <span style="font-size:7.5pt; color:var(--text-muted);">Tailored Profile</span>
                 </div>
             </div>
             """
 
-        # High contrast, traditional serif/sans ATS compliant
-        contacts = [c for c in [resume.email, resume.phone, resume.location, resume.linkedin, resume.github] if c]
-        contact_html = " | ".join(contacts)
+        # High contrast, ATS compliant contacts
+        use_icons = config.show_icons if config is not None else True
+        icon_email = "✉ " if use_icons else ""
+        icon_phone = "📞 " if use_icons else ""
+        icon_loc = "📍 " if use_icons else ""
+        icon_linkedin = "🔗 " if use_icons else ""
+        icon_github = "💻 " if use_icons else ""
+        icon_portfolio = "🌐 " if use_icons else ""
+
+        contacts = []
+        if resume.phone:
+            contacts.append(f'<span class="contact-item"><span class="contact-icon">{icon_phone}</span>{resume.phone}</span>')
+        if resume.email:
+            contacts.append(f'<span class="contact-item"><span class="contact-icon">{icon_email}</span>{resume.email}</span>')
+        if resume.linkedin:
+            l_href, l_label = self._format_url(resume.linkedin, "linkedin")
+            contacts.append(f'<a href="{l_href}" target="_blank" rel="noopener noreferrer" class="contact-item"><span class="contact-icon">{icon_linkedin}</span>{l_label}</a>')
+        if resume.github:
+            g_href, g_label = self._format_url(resume.github, "github")
+            contacts.append(f'<a href="{g_href}" target="_blank" rel="noopener noreferrer" class="contact-item"><span class="contact-icon">{icon_github}</span>{g_label}</a>')
+        if getattr(resume, "portfolio", None):
+            p_href, p_label = self._format_url(resume.portfolio, "portfolio")
+            contacts.append(f'<a href="{p_href}" target="_blank" rel="noopener noreferrer" class="contact-item"><span class="contact-icon">{icon_portfolio}</span>{p_label}</a>')
+        if resume.location:
+            contacts.append(f'<span class="contact-item"><span class="contact-icon">{icon_loc}</span>{resume.location}</span>')
+        contact_html = "".join(contacts)
 
         exp_html = ""
         for exp in resume.experience:
@@ -1143,61 +1270,61 @@ class TemplateEngine:
             for h in exp.highlights:
                 if highlight_diff:
                     h_rendered, is_modified, has_target_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
-                    if is_modified:
-                        bullets += f'<li style="background:#fef9c3; border-left:3px solid #f59e0b; padding-left:4px; margin-bottom:3px;"><span style="background:#fde68a; color:#92400e; font-size:7pt; font-weight:bold; padding:1px 4px; border-radius:2px; margin-right:4px;">+ TAILORED</span>{h_rendered}</li>'
-                    elif has_target_kw:
-                        bullets += f'<li style="background:#f0f9ff; border-left:3px solid #0284c7; padding-left:4px; margin-bottom:3px;"><span style="background:#bae6fd; color:#0369a1; font-size:7pt; font-weight:bold; padding:1px 4px; border-radius:2px; margin-right:4px;">★ KEY SKILL</span>{h_rendered}</li>'
-                    else:
-                        bullets += f'<li style="margin-bottom:3px;">{h_rendered}</li>'
+                    highlight_cls = "highlighted-bullet" if is_modified or has_target_kw else ""
                 else:
-                    bullets += f'<li style="margin-bottom:3px;">{h}</li>'
+                    h_rendered = h
+                    highlight_cls = ""
+                bullets += f'<li class="{highlight_cls}">{h_rendered}</li>\n'
 
             loc = f" — {exp.location}" if exp.location else ""
             exp_html += f"""
             <div class="experience-entry" style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; break-inside: avoid;">
               <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 2px;">
-                <span style="font-size: 10.5pt; color: #111;">{exp.role}</span>
+                <span class="exp-role" style="font-size: 10.5pt;">{exp.role}</span>
                 <span style="font-size: 9pt; font-weight: 600; color: #4b5563;">{exp.period}</span>
               </div>
-              <div style="font-style: italic; color: #4b5563; font-size: 10pt; margin-bottom: 5px;">{exp.company}{loc}</div>
-              <ul style="padding-left: 20px; font-size: 9.5pt; line-height: 1.5; color: #1f2937;">{bullets}</ul>
+              <div class="exp-company" style="font-style: italic; font-size: 10pt; margin-bottom: 5px;">{exp.company}{loc}</div>
+              <ul class="exp-highlights" style="padding-left: 20px; line-height: 1.5;">{bullets}</ul>
             </div>
             """
 
+        source_skills = resume.skills
+        if (not source_skills or not any(source_skills.values())) and base_resume and base_resume.skills:
+            source_skills = base_resume.skills
+
         skills_lines = []
-        for cat, items in resume.skills.items():
+        for cat, items in (source_skills or {}).items():
             cat_label = cat.replace("_", " ").title()
             pills = []
             for item in items:
                 if highlight_diff and (item.lower() in target_terms or any(t in item.lower() for t in target_terms if len(t) > 3)):
-                    pills.append(f'<span style="background:#dcfce7; border:1px solid #86efac; color:#166534; font-weight:bold; padding:1px 4px; border-radius:2px;">✓ {item}</span>')
+                    pills.append(f'<mark class="diff-kw-term">{item}</mark>')
                 else:
                     pills.append(item)
-            skills_lines.append(f"<strong>{cat_label}:</strong> " + ", ".join(pills))
+            if pills:
+                skills_lines.append(f"<strong>{cat_label}:</strong> " + ", ".join(pills))
         skills_html = "<br>".join(skills_lines)
 
         base_summary = base_resume.summary if base_resume else ""
-        is_summary_modified = False
-        if highlight_diff and base_resume:
-            is_summary_modified = (resume.summary.strip().lower() != base_summary.strip().lower())
-        elif highlight_diff:
-            is_summary_modified = True
-
         rendered_summary = (
             self.diff_text(resume.summary, base_summary, target_terms)
             if highlight_diff
             else resume.summary
         )
 
-        summary_style = "font-size: 9.5pt; line-height: 1.55; text-align: left; background: #f0fdf4; border-left: 3px solid #16a34a; padding: 6px 10px;" if is_summary_modified else "font-size: 9.5pt; line-height: 1.55; text-align: left;"
-        summary_badge = f' <span style="background:#dcfce7; color:#15803d; font-size:7pt; font-weight:bold; padding:1px 5px; border-radius:2px; vertical-align:middle;">+ TAILORED FOR {target_role.upper() if target_role else "TARGET"}</span>' if is_summary_modified else ''
+        summary_style = "line-height: 1.55; text-align: left;"
+        summary_badge = ""
 
         projects_html = ""
         show_proj = config.show_projects if config is not None else True
-        if show_proj and getattr(resume, "projects", None):
-            for proj in resume.projects:
+        valid_projects = [
+            p for p in (getattr(resume, "projects", None) or [])
+            if p.name and p.name.strip() and p.description and p.description.strip()
+        ]
+        if show_proj and valid_projects:
+            for proj in valid_projects:
                 techs = f" — <em>{', '.join(proj.technologies)}</em>" if proj.technologies else ""
-                url_s = f' <a href="{proj.url}" target="_blank">🔗</a>' if proj.url else ""
+                url_s = f' <a href="{proj.url}" target="_blank">🔗</a>' if (proj.url and not proj.url.endswith("TechieWithBeard")) else ""
                 period_s = f" ({proj.period})" if proj.period else ""
                 base_p_desc = base_projects_by_name.get(proj.name.strip().lower(), "")
                 rendered_p_desc = (
@@ -1207,8 +1334,8 @@ class TemplateEngine:
                 )
                 projects_html += f"""
                 <div class="project-card" style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb;">
-                  <div><strong>{proj.name}</strong>{period_s}{url_s}{techs}</div>
-                  <p style="font-size: 9.5pt; margin: 2px 0 6px 0;">{rendered_p_desc}</p>
+                  <div><strong class="project-name">{proj.name}</strong>{period_s}{url_s}{techs}</div>
+                  <p class="project-highlights" style="margin: 2px 0 6px 0;">{rendered_p_desc}</p>
                 </div>
                 """
 
@@ -1242,10 +1369,10 @@ class TemplateEngine:
 <style>
   body {{ font-family: "Georgia", Times, serif; color: #111; line-height: 1.4; padding: 0; margin: 0; background: transparent; }}
   .paper, .resume-paper {{ max-width: 840px; margin: 0 auto; background: #fff; padding: 36px 44px; box-shadow: 0 4px 24px -2px rgba(15, 23, 42, 0.12); border-radius: 6px; border: 1px solid #e2e8f0; }}
-  h1, .name {{ text-align: center; font-size: 24pt; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }}
-  .title, .title-tagline {{ text-align: center; font-size: 11pt; font-style: italic; margin-bottom: 4px; }}
-  .contacts {{ text-align: center; font-size: 9.5pt; border-bottom: 2px solid #222; padding-bottom: 12px; margin-bottom: 18px; }}
-  .sec-heading, .section-title {{ font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1.5px solid #222; padding-bottom: 3px; margin: 18px 0 10px 0; letter-spacing: 0.8px; }}
+  h1, .name {{ font-size: 24pt; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }}
+  .title, .title-tagline {{ font-size: 11pt; font-style: italic; margin-bottom: 4px; }}
+  .contacts {{ font-size: 9.5pt; border-bottom: 2px solid var(--primary-color); padding-bottom: 12px; margin-bottom: 18px; }}
+  .sec-heading, .section-title {{ font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1.5px solid var(--primary-color); padding-bottom: 3px; margin: 18px 0 10px 0; letter-spacing: 0.8px; }}
   .experience-entry:last-child, .project-card:last-child {{ border-bottom: none !important; padding-bottom: 0 !important; }}
   @media print {{ body {{ background: #fff; padding: 0; }} .paper, .resume-paper {{ box-shadow: none; padding: 0; }} .experience-entry, .project-card {{ border-bottom-color: #ccc !important; }} }}
   del.git-diff-del {{
@@ -1395,10 +1522,16 @@ class TemplateEngine:
             contacts.append(f'<span class="contact-item">{icon}{resume.location}</span>')
         if resume.linkedin:
             icon = "🔗 " if use_icons else ""
-            contacts.append(f'<a href="{resume.linkedin}" target="_blank" class="contact-item">{icon}LinkedIn</a>')
+            l_href, _ = self._format_url(resume.linkedin, "linkedin")
+            contacts.append(f'<a href="{l_href}" target="_blank" rel="noopener noreferrer" class="contact-item">{icon}LinkedIn</a>')
         if resume.github:
             icon = "💻 " if use_icons else ""
-            contacts.append(f'<a href="{resume.github}" target="_blank" class="contact-item">{icon}GitHub</a>')
+            g_href, _ = self._format_url(resume.github, "github")
+            contacts.append(f'<a href="{g_href}" target="_blank" rel="noopener noreferrer" class="contact-item">{icon}GitHub</a>')
+        if getattr(resume, "portfolio", None):
+            icon = "🌐 " if use_icons else ""
+            p_href, _ = self._format_url(resume.portfolio, "portfolio")
+            contacts.append(f'<a href="{p_href}" target="_blank" rel="noopener noreferrer" class="contact-item">{icon}Portfolio</a>')
         contact_html = " &bull; ".join(contacts)
 
         target_role = getattr(resume, "target_role", None) or resume.title or "Target Role"
@@ -1417,23 +1550,16 @@ class TemplateEngine:
         # Top Diff Legend Bar
         diff_legend_html = ""
         if highlight_diff:
-            diff_legend_html = """
-            <div class="cv-diff-banner avoid-break">
-                <div class="diff-banner-header">
-                    <span class="diff-banner-icon">🔍</span>
-                    <strong>DIFF VIEW ACTIVE:</strong> Visual audit of tailored modifications & job alignment
-                </div>
-                <div class="diff-legend-pills">
-                    <span class="legend-pill added"><span class="pill-dot bg-emerald"></span> Tailored Profile / Motivation</span>
-                    <span class="legend-pill mod"><span class="pill-dot bg-amber"></span> Adapted Fit & Value Driver</span>
-                    <span class="legend-pill kw"><span class="pill-dot bg-sky"></span> Target Keyword Match</span>
-                    <span class="legend-pill locked"><span class="pill-dot bg-slate"></span> Verified Ground Truth</span>
+            diff_legend_html = f"""
+            <div class="cv-diff-banner avoid-break" style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid var(--primary-color); border-radius:4px; padding:6px 12px; margin-bottom:12px; font-size:8pt; color:var(--text-primary);">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                    <span style="font-weight:700; color:var(--primary-color);">DIFF VIEW ACTIVE &bull; Showing customized keyword alignment for {target_role or "target role"}</span>
+                    <span style="font-size:7.5pt; color:var(--text-muted);">Tailored Profile</span>
                 </div>
             </div>
             """
 
         # Target Alignment Callout Banner
-        diff_pill_target = '<span class="diff-pill target">+ Targeted Profile</span>' if highlight_diff else ""
         target_str = f"<strong>{target_role}</strong>"
         if target_company:
             target_str += f" &bull; <span class='target-company'>{target_company}</span>"
@@ -1441,7 +1567,6 @@ class TemplateEngine:
         <div class="cv-target-banner avoid-break">
             <span class="target-badge">TARGET ROLE ALIGNMENT</span>
             <span class="target-details">{target_str}</span>
-            {diff_pill_target}
         </div>
         """
 
@@ -1461,7 +1586,7 @@ class TemplateEngine:
             if highlight_diff
             else why_company_raw
         )
-        why_comp_badge = f'<div class="diff-box-badge"><span class="diff-chip added">+ Tailored Profile</span> <span class="diff-note" style="font-size:7.5pt; color:#15803d; font-weight:600;">Aligned for {target_company}</span></div>' if highlight_diff else ""
+        why_comp_badge = ""
         why_comp_paras = [p.strip() for p in rendered_why_company.split("\n\n") if p.strip()]
         why_comp_html = "".join([f'<p class="letter-text">{p}</p>' for p in why_comp_paras])
 
@@ -1483,7 +1608,7 @@ class TemplateEngine:
             if highlight_diff
             else why_fit_raw
         )
-        why_fit_badge = f'<div class="diff-box-badge"><span class="diff-chip added">+ Tailored Profile</span> <span class="diff-note" style="font-size:7.5pt; color:#15803d; font-weight:600;">Positioned for {target_role}</span></div>' if highlight_diff else ""
+        why_fit_badge = ""
         why_fit_paras = [p.strip() for p in rendered_why_fit.split("\n\n") if p.strip()]
         why_fit_html = "".join([f'<p class="letter-text">{p}</p>' for p in why_fit_paras])
 
@@ -1500,8 +1625,6 @@ class TemplateEngine:
                     else scope_text
                 )
                 scope_tag = '<span class="scope-tag">SCOPE &amp; LEADERSHIP:</span>'
-                if highlight_diff:
-                    scope_tag = '<span class="scope-tag">SCOPE &amp; LEADERSHIP:</span> <span class="diff-pill scope">+ Role Scope Enriched</span>'
 
                 env_pills = ""
                 if getattr(exp, "technologies", None):
@@ -1514,9 +1637,8 @@ class TemplateEngine:
                 for h in exp.highlights[:2]:
                     if highlight_diff:
                         h_rendered, is_mod, has_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
-                        cls = "highlighted-bullet mod" if is_mod else ("highlighted-bullet kw" if has_kw else "")
-                        b_badge = '<span class="diff-bullet-badge mod">+ Tailored</span> ' if is_mod else ('<span class="diff-bullet-badge kw">★ Key Skill</span> ' if has_kw else "")
-                        b_html += f'<li class="{cls}">{b_badge}{h_rendered}</li>\n'
+                        cls = "highlighted-bullet" if is_mod or has_kw else ""
+                        b_html += f'<li class="{cls}">{h_rendered}</li>\n'
                     else:
                         b_html += f'<li>{h}</li>\n'
 
@@ -1540,13 +1662,15 @@ class TemplateEngine:
                 """)
 
         # Flagship Architectural Projects / Case Studies
-        projects = getattr(resume, "projects", None) or []
+        valid_cv_projects = [
+            p for p in (getattr(resume, "projects", None) or [])
+            if p.name and p.name.strip() and p.description and p.description.strip()
+        ]
         project_callouts = []
-        for p in projects:
+        for p in valid_cv_projects:
             p_role = f'<span class="case-study-role">{p.role}</span>' if p.role else ""
             p_period = f'<span class="entry-period">{p.period}</span>' if p.period else ""
-            url_link = f' <a href="{p.url}" target="_blank" class="entry-link">↗ Link</a>' if p.url else ""
-            proj_diff = '<span class="diff-pill scope">★ Targeted Case Study</span>' if highlight_diff else ""
+            url_link = f' <a href="{p.url}" target="_blank" class="entry-link">↗ Link</a>' if (p.url and not p.url.endswith("TechieWithBeard")) else ""
             tech_badges = ""
             if p.technologies:
                 badges = "".join([f'<span class="tech-badge">{t}</span>' for t in p.technologies])
@@ -1569,7 +1693,6 @@ class TemplateEngine:
                         <span class="entry-title">{p.name}</span>
                         {f'<span class="entry-sep">|</span> {p_role}' if p_role else ''}
                         {url_link}
-                        {proj_diff}
                     </div>
                     {p_period}
                 </div>
@@ -1621,14 +1744,17 @@ class TemplateEngine:
 
         # Technical Taxonomy Cards
         skill_cards = ""
-        for cat_name, skill_list in (resume.skills or {}).items():
+        source_skills = resume.skills
+        if (not source_skills or not any(source_skills.values())) and base_resume and base_resume.skills:
+            source_skills = base_resume.skills
+
+        for cat_name, skill_list in (source_skills or {}).items():
             formatted_cat = cat_name.replace("_", " ").title()
             pills = []
             for s in skill_list:
                 is_matched = highlight_diff and (s.lower() in target_terms or any(t in s.lower() for t in target_terms if len(t) > 3))
                 matched_cls = " matched" if is_matched else ""
-                icon_prefix = "✓ " if is_matched else ""
-                pills.append(f'<span class="competency-pill{matched_cls}">{icon_prefix}{s}</span>')
+                pills.append(f'<span class="competency-pill{matched_cls}">{s}</span>')
             skill_cards += f"""
             <div class="competency-card avoid-break">
                 <div class="competency-title">{formatted_cat}</div>
@@ -1703,15 +1829,14 @@ class TemplateEngine:
   .header-doc-type {{
     font-size: 8pt;
     font-weight: 700;
-    color: var(--accent-color);
+    color: #ffffff;
     letter-spacing: 1.5px;
     text-transform: uppercase;
-    background: #e0e7ff;
+    background: var(--primary-color);
     padding: 3px 8px;
     border-radius: 3px;
   }}
   .header {{
-    text-align: left;
     margin-bottom: 14px;
   }}
   .name {{
@@ -1802,9 +1927,9 @@ class TemplateEngine:
     display: flex;
     align-items: center;
     gap: 10px;
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    border-left: 4px solid var(--accent-light);
+    background: #f8fafc;
+    border: 1px solid var(--border-subtle);
+    border-left: 4px solid var(--accent-color);
     padding: 8px 14px;
     border-radius: 0 4px 4px 0;
     margin: 10px 0 14px 0;
@@ -1812,8 +1937,8 @@ class TemplateEngine:
   .target-badge {{
     font-size: 7.5pt;
     font-weight: 800;
-    color: var(--accent-color);
-    background: #dbeafe;
+    color: #ffffff;
+    background: var(--primary-color);
     padding: 2px 7px;
     border-radius: 3px;
     letter-spacing: 0.8px;
@@ -1915,8 +2040,8 @@ class TemplateEngine:
     margin-left: 4px;
   }}
   .role-scope-box {{
-    background: #eff6ff;
-    border-left: 3px solid #3b82f6;
+    background: #f8fafc;
+    border-left: 3px solid var(--accent-color);
     padding: 6px 10px;
     margin: 6px 0 8px 0;
     border-radius: 0 3px 3px 0;
@@ -2356,11 +2481,13 @@ class TemplateEngine:
 <div class="resume-paper paper">
   {diff_legend_html}
   <header class="header">
-    <div class="header-top-row">
-      <h1 class="name">{resume.name}</h1>
-      <span class="header-doc-type">Curriculum Vitae</span>
+    <div class="header-info">
+      <div class="header-top-row">
+        <h1 class="name">{resume.name}</h1>
+        <span class="header-doc-type">Curriculum Vitae</span>
+      </div>
+      <div class="title-tagline">{resume.title}{f" • {resume.tagline}" if (config is None or config.show_tagline) and resume.tagline else ""}</div>
     </div>
-    <div class="title-tagline">{resume.title}{f" • {resume.tagline}" if (config is None or config.show_tagline) and resume.tagline else ""}</div>
     <div class="contacts">{contact_html}</div>
   </header>
 

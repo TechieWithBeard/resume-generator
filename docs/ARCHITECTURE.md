@@ -11,6 +11,7 @@ graph TB
     subgraph Client ["Frontend: Modern Angular (Signals)"]
         UI[Workspace Dashboard]
         JI[Job Input Component]
+        HITL[HITL Mismatch Resolution Modal]
         SC[Real-Time Decision Stream Console]
         RP[Interactive ATS Resume Preview]
         BRM[Base Resume Editor Modal]
@@ -18,16 +19,18 @@ graph TB
         Svc[ResumeGeneratorService]
         
         UI --> JI
+        UI --> HITL
         UI --> SC
         UI --> RP
         UI --> BRM
         UI --> SD
-        JI & SC & RP & BRM & SD <--> Svc
+        JI & HITL & SC & RP & BRM & SD <--> Svc
     end
 
     subgraph NetworkBoundary ["HTTP / REST / SSE Boundary"]
-        REST[REST Endpoints: /api/resume, /api/templates, /api/health]
-        SSE[SSE Stream Endpoint: /api/generate/stream]
+        REST[REST Endpoints: /api/resume, /api/templates, /api/template/config, /api/resume/score]
+        PRE[Preflight Check: POST /api/generate/preflight]
+        SSE[SSE Stream Endpoint: POST /api/generate/stream]
     end
 
     subgraph Server ["Backend: Python ASGI Engine"]
@@ -35,12 +38,14 @@ graph TB
         Extractor[LinkedIn Scraper & Parser]
         Store[Resume Store & In-Memory Cache]
         Renderer[Jinja2 / String Template Engine]
+        ScoreChecker[9-Dimension Resume Score Checker]
         
         subgraph LangChainCore ["LangChain Orchestration Pipeline"]
-            P1[Stage 1: Job Spec Deconstruction]
-            P2[Stage 2: Competency & Truth Audit]
-            P3[Stage 3: Constrained Resume Synthesis]
-            P4[Stage 4: Programmatic Anti-Hallucination Audit]
+            P0[Stage 0: Preflight Competency & Gap Audit]
+            P1[Stage 1: Job Spec Deconstruction & Web Intelligence]
+            P2[Stage 2: Competency & Transferable Skills Audit]
+            P3[Stage 3: Constrained Synthesis with Candidate Guidance]
+            P4[Stage 4: 7-Check Programmatic Anti-Hallucination Gate]
         end
         
         subgraph LLMAdapters ["LLM Provider Abstraction Layer"]
@@ -52,11 +57,13 @@ graph TB
     end
 
     Svc -->|GET / PUT| REST
+    Svc -->|POST preflight| PRE
     Svc -->|POST stream| SSE
-    REST & SSE --> API
+    REST & PRE & SSE --> API
     API --> Extractor
     API --> Store
     API --> Renderer
+    API --> ScoreChecker
     API --> LangChainCore
     LangChainCore --> OllamaAdapter
     LangChainCore --> OpenAIAdapter
@@ -142,34 +149,89 @@ resume-generator/
 The candidate's Base Resume is the single source of truth. The system guarantees that:
 1. **Employment History Invariance**: Company names, dates of employment, and job titles cannot be created out of thin air.
 2. **Education Invariance**: Degrees, institutions, and graduation years cannot be modified or fabricated.
-3. **Skill Grounding**: Every highlighted or prioritized skill must either exist in the Base Resume or be an explicitly verified synonym/transferable capability.
-4. **Achievement Framing**: Bullet points must rephrase or contextualize *actual achievements* from the candidate's history rather than inventing fictional projects or responsibilities.
+3. **Timeline Invariance**: Employment periods cannot be extended, shortened, or fabricated.
+4. **Identity Invariance**: Contact information (Name, Email, Phone, LinkedIn, GitHub, Portfolio) is preserved verbatim and normalized to absolute URLs.
+5. **Project & Certification Invariance**: Architectural case studies and certifications must originate strictly from candidate ground truth.
+6. **Strict Skills Non-Fabrication Gate (Check 7)**: Every skill presented in the final resume must be grounded in the candidate's verified ground truth corpus (`skills`, `experience`, `projects`, `certifications`, `raw_text`, `summary`). Any ungrounded skill (e.g. FreeRTOS, Swift, Go, Kubernetes if not in source) is automatically purged.
+7. **Achievement Framing**: Bullet points must rephrase or contextualize *actual achievements* from the candidate's history rather than inventing fictional projects or responsibilities.
 
-### Programmatic Verification Stage
-Before any generated resume payload is sent to the client:
+### Programmatic Verification Stage (7 Deterministic Checks)
+Before any generated resume payload is sent to the client, `_verify_anti_hallucination()` executes:
 ```python
-def verify_anti_hallucination(base_resume: ResumeData, generated: ResumeData) -> VerificationResult:
-    # 1. Verify companies
+def _verify_anti_hallucination(self, base_resume: ResumeData, generated: ResumeData) -> VerificationResult:
+    # Check 1: Verify companies
     base_companies = {exp.company.lower().strip() for exp in base_resume.experience}
     gen_companies = {exp.company.lower().strip() for exp in generated.experience}
     rogue_companies = gen_companies - base_companies
     if rogue_companies:
         raise AntiHallucinationViolation(f"Unauthorized companies detected: {rogue_companies}")
     
-    # 2. Verify education
+    # Check 2: Verify education & institutions
     base_schools = {edu.institution.lower().strip() for edu in base_resume.education}
     gen_schools = {edu.institution.lower().strip() for edu in generated.education}
     rogue_schools = gen_schools - base_schools
     if rogue_schools:
         raise AntiHallucinationViolation(f"Unauthorized education institutions detected: {rogue_schools}")
+
+    # Check 3: Verify employment timelines
+    base_periods = {exp.period.strip() for exp in base_resume.experience}
+    gen_periods = {exp.period.strip() for exp in generated.experience}
+    rogue_periods = gen_periods - base_periods
+    if rogue_periods:
+        raise AntiHallucinationViolation(f"Unauthorized employment periods detected: {rogue_periods}")
+
+    # Check 4: Verify personal identity
+    if generated.name.strip().lower() != base_resume.name.strip().lower():
+        raise AntiHallucinationViolation("Candidate identity mismatch")
+
+    # Check 5: Verify project names
+    base_proj_names = {p.name.lower().strip() for p in (base_resume.projects or [])}
+    for p in (generated.projects or []):
+        if p.name.lower().strip() not in base_proj_names:
+            generated.projects = [proj for proj in generated.projects if proj.name.lower().strip() in base_proj_names]
+
+    # Check 6: Verify certification credentials
+    base_cert_names = {c.name.lower().strip() for c in (base_resume.certifications or [])}
+    for c in (generated.certifications or []):
+        if c.name.lower().strip() not in base_cert_names:
+            generated.certifications = [cert for cert in generated.certifications if cert.name.lower().strip() in base_cert_names]
+
+    # Check 7: Strict Skills Non-Fabrication Gate
+    # Purge any skill not grounded in candidate ground-truth corpus
+    corpus = self._extract_full_candidate_corpus(base_resume)
+    for category, skill_list in list(generated.skills.items()):
+        verified_skills = [
+            skill for skill in skill_list
+            if self._is_skill_grounded(skill, corpus, base_resume)
+        ]
+        generated.skills[category] = verified_skills
     
     return VerificationResult(status="PASSED", rogue_entities=[])
 ```
 
 ---
 
-## 4. Streaming Protocol (Server-Sent Events)
+## 4. HTTP API & Streaming Protocol
 
+### HTTP REST Endpoints
+| Method | Path | Request Body | Response | Description |
+|---|---|---|---|---|
+| `POST` | `/api/generate/preflight` | `JobInput` | `PreflightReport` | Fast preflight audit detecting role/competency gaps & triggering HITL dialog |
+| `POST` | `/api/generate/stream` | `JobInput` | `text/event-stream` | Real-time SSE decision streaming & tailored resume synthesis |
+| `GET` | `/api/resume/base` | None | `ResumeData` | Retrieves candidate Ground Truth profile |
+| `PUT` | `/api/resume/base` | `ResumeData` | `{"status": "ok"}` | Persists updated Ground Truth profile |
+| `POST` | `/api/resume/upload` | `{"file_content": str, "filename": str}` | `ResumeData` | Ingests PDF/DOCX/TXT/JSON into Ground Truth profile |
+| `GET` | `/api/resume/score` | None | `ScoreCard` | Audits candidate ground truth against 9-dimension rubric |
+| `POST` | `/api/resume/score` | `{"resume": ResumeData, "target_role": str}` | `ScoreCard` | Audits tailored resume against specific role |
+| `GET` | `/api/template/config` | None | `TemplateConfig` | Retrieves saved visual styling & design tokens |
+| `PUT` | `/api/template/config` | `TemplateConfig` | `{"status": "ok"}` | Updates and persists custom styling preferences |
+| `POST` | `/api/template/config/reset` | None | `TemplateConfig` | Resets styling preferences to default |
+| `POST` | `/api/render` | `{"resume": ResumeData, "template_id": str}` | `{"html": str}` | Renders printable ATS HTML with injected design tokens |
+| `GET` | `/api/evals/cases` | None | `List[EvalCaseSummary]` | Lists all 6 evaluation benchmark cases |
+| `POST` | `/api/evals/run` | `{"case_id": Optional[str], "provider": str}` | `EvalSuiteReport` | Executes benchmark evaluation and audits all 5 checkpoints |
+| `GET` | `/api/evals/latest` | None | `EvalSuiteReport` | Retrieves latest cached evaluation benchmark report |
+
+### Streaming Protocol (Server-Sent Events)
 Streaming endpoint: `POST /api/generate/stream`  
 Content-Type: `text/event-stream; charset=utf-8`
 
@@ -178,7 +240,7 @@ Content-Type: `text/event-stream; charset=utf-8`
 |---|---|---|
 | `step` | `{"step": "analysis|audit|synthesis|verification", "title": str, "status": "running|done"}` | Progress stepper milestone transition |
 | `thought` | `{"step": str, "content": str, "timestamp": str}` | Fine-grained internal reasoning token/chunk |
-| `audit` | `{"match_score": int, "direct_matches": list, "transferable": list, "gaps": list}` | Alignment audit and competency matrix |
+| `audit` | `{"match_score": int, "direct_matches": list, "transferable": list, "unmatched_skills": list, "is_low_match": bool}` | Alignment audit and competency matrix |
 | `resume_chunk` | `{"section": str, "data": dict}` | Incremental preview update |
 | `complete` | `{"resume": ResumeData, "html": str, "audit": AlignmentReport}` | Final synthesized resume and pre-rendered HTML |
 | `error` | `{"message": str, "code": str}` | Structured error notification |

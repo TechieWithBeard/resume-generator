@@ -260,6 +260,21 @@ async def app(scope, receive, send):
         await send({"type": "http.response.body", "body": body})
         return
 
+    # Route: POST /api/generate/preflight
+    if path == "/api/generate/preflight" and method == "POST":
+        raw = await read_body(receive)
+        data = json.loads(raw.decode("utf-8")) if raw else {}
+        job_input_data = data.get("job_input", {})
+        job_input = JobInput.model_validate(job_input_data)
+        base_res_data = data.get("base_resume")
+        base_res = ResumeData.model_validate(base_res_data) if base_res_data else resume_store.get_base_resume()
+
+        preflight_report = generator_chain.preflight_check(job_input=job_input, base_resume=base_res)
+        status, headers, body = send_json(preflight_report.model_dump())
+        await send({"type": "http.response.start", "status": status, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+        return
+
     # Route: POST /api/generate/stream (Server-Sent Events)
     if path == "/api/generate/stream" and method == "POST":
         raw = await read_body(receive)

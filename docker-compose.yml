@@ -1,4 +1,58 @@
 services:
+  # ==============================================================================
+  # 1. Local AI Model Server (Ollama)
+  # ==============================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: resume-generator-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      # Persist downloaded LLM weights so models are never re-downloaded
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 8s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+  # ==============================================================================
+  # 2. Automated Model Provisioner (Pulls model once into Ollama volume)
+  # ==============================================================================
+  ollama-model-puller:
+    image: curlimages/curl:latest
+    container_name: resume-generator-model-puller
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "============================================================"
+        echo "🦙 Ollama Automated Model Setup Engine"
+        echo "Target Model: $${OLLAMA_MODEL:-llama3.2}"
+        echo "============================================================"
+        
+        # Check if model is already downloaded in Ollama catalog
+        if curl -s http://ollama:11434/api/tags | grep -q "$${OLLAMA_MODEL:-llama3.2}"; then
+          echo "✓ Model '$${OLLAMA_MODEL:-llama3.2}' is already present in persistent volume."
+        else
+          echo "📥 Downloading '$${OLLAMA_MODEL:-llama3.2}' into Ollama storage volume..."
+          echo "This is a one-time automated download (~2.0 GB). Streaming progress..."
+          curl -s -X POST http://ollama:11434/api/pull -d "{\"name\": \"$${OLLAMA_MODEL:-llama3.2}\"}"
+          echo ""
+          echo "✓ Model '$${OLLAMA_MODEL:-llama3.2}' successfully installed and ready!"
+        fi
+        echo "============================================================"
+    restart: "no"
+
+  # ==============================================================================
+  # 3. Unified Application (Angular 22 Frontend + FastAPI / LangChain Backend)
+  # ==============================================================================
   resume-generator:
     build:
       context: .
@@ -8,10 +62,21 @@ services:
       - "8000:8000"
     environment:
       - PORT=8000
+      - ENV=production
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
       - RESUME_DATA_PATH=/app/backend/data/my_resume.json
     volumes:
-      # Mount user's personal resume so edits persist across container runs
-      - ./backend/data/my_resume.json:/app/backend/data/my_resume.json:rw
+      # Mount user's personal resume data folder to persist uploaded files & configs
+      - ./backend/data:/app/backend/data:rw
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-model-puller:
+        condition: service_completed_successfully
     restart: unless-stopped
+
+volumes:
+  ollama_data:
+    driver: local
