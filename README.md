@@ -10,6 +10,10 @@
 
 An end-to-end, production-grade AI Resume & CV Platform that tailors candidate profiles to target job descriptions and company intelligence in real time. Designed with a strict **Zero-Hallucination Ground Truth Invariant**, an **ATS-Tested 2-Column Layout** with a strict **1–2 page hard cap**, and a built-in **9-Dimension Resume Score Checker** matching the official [MyPerfectResume](https://www.myperfectresume.com) scoring rubric.
 
+<p align="center">
+  <img src="docs/app_screenshot.png" alt="AI Resume & CV Platform Interface" width="100%" />
+</p>
+
 ---
 
 ## 🌟 Key Highlights
@@ -91,9 +95,9 @@ The built-in audit engine ([backend/app/services/resume_score_checker.py](backen
 +-----------------------------------------------------------------------------------------------+
 |  ✓ ATS-tested template • built to parse more cleanly                                          |
 |                                                                                               |
-|  VISHNU THANKAPPAN                                                                            |
+|  ALEX MERCER                                                                                  |
 |  Senior Frontend Engineer                                                                     |
-|  📞 +1 (555) 019-2834  ✉ vishnut071@gmail.com  💻 https://github.com/TechieWithBeard  📍 India   |
+|  📞 +1 (555) 019-2834  ✉ alex.mercer.dev@example.com  💻 https://github.com/alex-mercer  📍 San Francisco, CA |
 +-----------------------------------------------------------------------------------------------+
 |  LEFT COLUMN (~62%)                                 |  RIGHT COLUMN (~38%)                    |
 |                                                     |                                         |
