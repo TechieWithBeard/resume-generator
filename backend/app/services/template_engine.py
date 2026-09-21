@@ -112,7 +112,7 @@ class TemplateEngine:
             color: var(--text-primary) !important;
             line-height: var(--line-height) !important;
         }}
-        body, p, li, .summary-text, .exp-highlights, .project-highlights, .contacts, .exp-period, .edu-item, .edu-period, .skill-badge {{
+        body, p, li, .summary-text, .exp-highlights, .project-highlights, .contacts, .exp-period, .edu-item, .edu-period, .skill-badge, .skill-cat-title, .skill-cat-items, .skill-row, .skill-item, .tech-badge {{
             font-size: var(--font-size) !important;
             line-height: var(--line-height) !important;
         }}
@@ -153,7 +153,7 @@ class TemplateEngine:
         .section, .cv-section {{
             margin-bottom: {section_margin} !important;
         }}
-        .experience-entry, .project-card, .cv-project-card, .education-entry, .edu-item, .cv-entry {{
+        .experience-entry, .project-card, .project-entry, .cv-project-card, .education-entry, .edu-item, .cv-entry, .cert-entry {{
             margin-bottom: {item_margin} !important;
         }}
         .exp-highlights li, .project-highlights li {{
@@ -422,7 +422,7 @@ class TemplateEngine:
                     bullet_badge = ""
                 bullets += f'<li class="{highlight_cls}">{bullet_badge}{h_rendered}</li>\n'
             
-            loc_str = f'<span class="exp-location">{exp.location}</span>' if exp.location else ''
+            loc_str = f'<span class="exp-location">• {exp.location}</span>' if exp.location else ''
             exp_html += f"""
             <div class="experience-entry">
                 <div class="exp-header">
@@ -446,17 +446,18 @@ class TemplateEngine:
         skills_html = ""
         for cat_name, skill_list in resume.skills.items():
             formatted_cat = cat_name.replace("_", " ").title()
-            badges = []
+            items_rendered = []
             for s in skill_list:
                 is_matched = highlight_diff and (s.lower() in target_terms or any(t in s.lower() for t in target_terms if len(t) > 3))
                 if is_matched:
-                    badges.append(f'<span class="skill-badge matched" style="background:#dcfce7; border:1px solid #86efac; color:#166534; font-weight:700;">✓ {s}</span>')
+                    items_rendered.append(f'<span class="skill-item matched" style="background:#dcfce7; color:#166534; font-weight:600; padding:1px 4px; border-radius:2px;">✓ {s}</span>')
                 else:
-                    badges.append(f'<span class="skill-badge">{s}</span>')
+                    items_rendered.append(f'<span class="skill-item">{s}</span>')
+            items_str = ", ".join(items_rendered)
             skills_html += f"""
-            <div class="skill-group">
-                <span class="skill-label">{formatted_cat}:</span>
-                <div class="skill-badges">{''.join(badges)}</div>
+            <div class="skill-row">
+                <span class="skill-cat-title">{formatted_cat}:</span>
+                <span class="skill-cat-items">{items_str}</span>
             </div>
             """
 
@@ -465,8 +466,8 @@ class TemplateEngine:
         show_proj = config.show_projects if config is not None else True
         if show_proj and getattr(resume, "projects", None):
             for proj in resume.projects:
-                tech_badges = "".join([f'<span class="tech-badge" style="background:#f1f5f9; color:#334155; padding:2px 6px; border-radius:3px; font-size:8pt; margin-right:4px;">{t}</span>' for t in proj.technologies])
-                url_link = f' <a href="{proj.url}" target="_blank" style="color:var(--accent-color); text-decoration:none; font-size:8pt;">🔗</a>' if proj.url else ''
+                tech_badges = "".join([f'<span class="tech-badge">{t}</span>' for t in proj.technologies])
+                url_link = f' <a href="{proj.url}" target="_blank" class="proj-link" title="Open Link">🔗</a>' if proj.url else ''
                 period_str = f'<span class="exp-period">{proj.period}</span>' if proj.period else ''
                 base_p_desc = base_projects_by_name.get(proj.name.strip().lower(), "")
                 rendered_p_desc = (
@@ -474,14 +475,15 @@ class TemplateEngine:
                     if highlight_diff and proj.description
                     else proj.description
                 )
+                tech_container = f'<div class="proj-techs">{tech_badges}</div>' if tech_badges else ''
                 projects_html += f"""
-                <div class="experience-entry">
+                <div class="project-entry">
                     <div class="exp-header">
                         <span class="exp-role">{proj.name}{url_link}</span>
                         {period_str}
                     </div>
                     <div class="summary-text" style="margin-bottom: 4px;">{rendered_p_desc}</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">{tech_badges}</div>
+                    {tech_container}
                 </div>
                 """
 
@@ -508,7 +510,12 @@ class TemplateEngine:
             for cert in resume.certifications:
                 yr = f" ({cert.year})" if cert.year else ""
                 url_str = f' <a href="{cert.url}" target="_blank" style="color:var(--accent-color); text-decoration:none;">🔗</a>' if cert.url else ""
-                cert_html += f'<div class="education-entry"><span class="edu-degree">{cert.name}</span><span class="edu-inst">{cert.issuer}{yr}{url_str}</span></div>'
+                cert_html += f"""
+                <div class="education-entry">
+                    <span class="edu-degree">{cert.name}</span>
+                    <span class="edu-inst">{cert.issuer}{yr}{url_str}</span>
+                </div>
+                """
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -520,10 +527,11 @@ class TemplateEngine:
   :root {{
     --primary-color: #0f172a;
     --accent-color: #0284c7;
-    --accent-light: #e0f2fe;
+    --accent-light: #f0f9ff;
     --text-primary: #1e293b;
     --text-muted: #64748b;
     --border-color: #cbd5e1;
+    --divider-subtle: #e2e8f0;
     --diff-bg: #f0fdf4;
     --diff-border: #16a34a;
   }}
@@ -543,99 +551,143 @@ class TemplateEngine:
     max-width: 850px;
     margin: 0 auto;
     background: #ffffff;
-    padding: 48px 52px;
+    padding: 44px 50px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-    border-radius: 6px;
+    border-radius: 4px;
   }}
   .header {{
-    border-bottom: 2px solid var(--accent-color);
-    padding-bottom: 18px;
-    margin-bottom: 22px;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 14px;
+    margin-bottom: 18px;
   }}
   .name {{
-    font-size: 28pt;
+    font-size: 24pt;
     font-weight: 700;
     color: var(--primary-color);
-    letter-spacing: -0.5px;
-    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+    margin-bottom: 3px;
+    text-transform: uppercase;
   }}
   .title-tagline {{
-    font-size: 13pt;
+    font-size: 11.5pt;
     font-weight: 600;
     color: var(--accent-color);
     margin-bottom: 8px;
+    letter-spacing: 0.2px;
   }}
   .contacts {{
-    font-size: 9.5pt;
+    font-size: 9pt;
     color: var(--text-muted);
+    line-height: 1.4;
   }}
   .contacts a {{
-    color: var(--accent-color);
+    color: var(--primary-color);
     text-decoration: none;
+    font-weight: 500;
+  }}
+  .contacts a:hover {{
+    color: var(--accent-color);
+    text-decoration: underline;
   }}
   .section {{
-    margin-bottom: 22px;
+    margin-bottom: 18px;
   }}
   .section-title {{
-    font-size: 11.5pt;
+    font-size: 10.5pt;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
+    letter-spacing: 1px;
     color: var(--primary-color);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1.5px solid var(--primary-color);
     padding-bottom: 4px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }}
   .summary-text {{
-    font-size: 10pt;
+    font-size: 9.5pt;
     color: var(--text-primary);
-    line-height: 1.6;
-    text-align: justify;
+    line-height: 1.55;
+    text-align: left;
   }}
   .experience-entry {{
-    margin-bottom: 16px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--divider-subtle);
     page-break-inside: avoid;
     break-inside: avoid;
+  }}
+  .experience-entry:last-child {{
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }}
+  .project-entry {{
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--divider-subtle);
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }}
+  .project-entry:last-child {{
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
   }}
   .exp-header {{
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     margin-bottom: 5px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }}
+  .exp-role-company {{
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 5px;
   }}
   .exp-role {{
-    font-size: 11pt;
+    font-size: 10.5pt;
     font-weight: 700;
     color: var(--primary-color);
   }}
   .exp-sep {{
-    color: var(--border-color);
-    margin: 0 4px;
+    color: #94a3b8;
+    margin: 0 1px;
   }}
   .exp-company {{
     font-size: 10.5pt;
     font-weight: 600;
     color: var(--accent-color);
   }}
-  .exp-period {{
-    font-size: 9.5pt;
-    font-weight: 500;
-    color: var(--text-muted);
-  }}
-  .exp-location {{
+  .exp-meta {{
+    text-align: right;
     font-size: 9pt;
     color: var(--text-muted);
-    margin-left: 8px;
+    white-space: nowrap;
+  }}
+  .exp-period {{
+    font-size: 9pt;
+    font-weight: 600;
+    color: #475569;
+  }}
+  .exp-location {{
+    font-size: 8.5pt;
+    color: var(--text-muted);
+    margin-left: 4px;
   }}
   .exp-highlights {{
-    list-style: disc;
+    list-style-type: disc;
     padding-left: 18px;
     font-size: 9.5pt;
     color: var(--text-primary);
-    line-height: 1.55;
+    line-height: 1.5;
   }}
   .exp-highlights li {{
-    margin-bottom: 4px;
+    margin-bottom: 3.5px;
   }}
   .highlighted-bullet {{
     background-color: var(--diff-bg);
@@ -709,10 +761,37 @@ class TemplateEngine:
       text-decoration: none !important;
     }}
   }}
+  .skill-row {{
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 5px;
+    font-size: 9.5pt;
+    line-height: 1.5;
+  }}
+  .skill-cat-title {{
+    font-weight: 700;
+    color: var(--primary-color);
+    width: 170px;
+    flex-shrink: 0;
+  }}
+  .skill-cat-items {{
+    color: var(--text-primary);
+    flex-grow: 1;
+  }}
+  .skill-item {{
+    display: inline;
+  }}
+  .skill-item.matched {{
+    background-color: #dcfce7;
+    color: #166534;
+    font-weight: 600;
+    padding: 0 3px;
+    border-radius: 2px;
+  }}
   .skill-group {{
     display: flex;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     font-size: 9.5pt;
   }}
   .skill-label {{
@@ -729,35 +808,65 @@ class TemplateEngine:
   .skill-badge {{
     background: #f1f5f9;
     color: #334155;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 9pt;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 8.5pt;
     font-weight: 500;
     border: 1px solid #e2e8f0;
+  }}
+  .tech-badge {{
+    background: #f1f5f9;
+    color: #334155;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 8pt;
+    margin-right: 4px;
+    border: 1px solid #e2e8f0;
+    display: inline-block;
+  }}
+  .proj-techs {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+  }}
+  .proj-link {{
+    color: var(--accent-color);
+    text-decoration: none;
+    font-size: 8pt;
+    margin-left: 4px;
   }}
   .education-entry {{
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     font-size: 9.5pt;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
+    padding-bottom: 4px;
     page-break-inside: avoid;
     break-inside: avoid;
+  }}
+  .edu-degree-inst {{
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px;
   }}
   .edu-degree {{
     font-weight: 700;
     color: var(--primary-color);
   }}
   .edu-sep {{
-    color: var(--border-color);
-    margin: 0 4px;
+    color: #94a3b8;
+    margin: 0 2px;
   }}
   .edu-inst {{
-    color: var(--text-muted);
+    color: var(--text-primary);
   }}
   .edu-period {{
     color: var(--text-muted);
     font-weight: 500;
+    font-size: 9pt;
   }}
 
   @media print {{
@@ -776,6 +885,9 @@ class TemplateEngine:
       background-color: transparent !important;
       border-left: none !important;
       padding-left: 0 !important;
+    }}
+    .experience-entry, .project-entry {{
+      border-bottom-color: #e2e8f0 !important;
     }}
     @page {{
       margin: 1.2cm 1.5cm;
@@ -897,13 +1009,13 @@ class TemplateEngine:
 
             loc = f" — {exp.location}" if exp.location else ""
             exp_html += f"""
-            <div class="experience-entry" style="margin-bottom: 14px; break-inside: avoid;">
-              <div style="display: flex; justify-content: space-between; font-weight: bold;">
-                <span>{exp.role}</span>
-                <span>{exp.period}</span>
+            <div class="experience-entry" style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; break-inside: avoid;">
+              <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 2px;">
+                <span style="font-size: 10.5pt; color: #111;">{exp.role}</span>
+                <span style="font-size: 9pt; font-weight: 600; color: #4b5563;">{exp.period}</span>
               </div>
-              <div style="font-style: italic; color: #444; margin-bottom: 4px;">{exp.company}{loc}</div>
-              <ul style="padding-left: 20px; font-size: 10pt; line-height: 1.5;">{bullets}</ul>
+              <div style="font-style: italic; color: #4b5563; font-size: 10pt; margin-bottom: 5px;">{exp.company}{loc}</div>
+              <ul style="padding-left: 20px; font-size: 9.5pt; line-height: 1.5; color: #1f2937;">{bullets}</ul>
             </div>
             """
 
@@ -932,7 +1044,7 @@ class TemplateEngine:
             else resume.summary
         )
 
-        summary_style = "font-size: 10pt; text-align: justify; background: #f0fdf4; border-left: 3px solid #16a34a; padding: 6px 10px;" if is_summary_modified else "font-size: 10pt; text-align: justify;"
+        summary_style = "font-size: 9.5pt; line-height: 1.55; text-align: left; background: #f0fdf4; border-left: 3px solid #16a34a; padding: 6px 10px;" if is_summary_modified else "font-size: 9.5pt; line-height: 1.55; text-align: left;"
         summary_badge = f' <span style="background:#dcfce7; color:#15803d; font-size:7pt; font-weight:bold; padding:1px 5px; border-radius:2px; vertical-align:middle;">+ TAILORED FOR {target_role.upper() if target_role else "TARGET"}</span>' if is_summary_modified else ''
 
         projects_html = ""
@@ -949,7 +1061,7 @@ class TemplateEngine:
                     else proj.description
                 )
                 projects_html += f"""
-                <div class="project-card" style="margin-bottom: 10px;">
+                <div class="project-card" style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb;">
                   <div><strong>{proj.name}</strong>{period_s}{url_s}{techs}</div>
                   <p style="font-size: 9.5pt; margin: 2px 0 6px 0;">{rendered_p_desc}</p>
                 </div>
@@ -960,9 +1072,9 @@ class TemplateEngine:
         if show_edu and resume.education:
             for edu in resume.education:
                 edu_html += f"""
-                <div class="education-entry" style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10pt;">
+                <div class="education-entry" style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 9.5pt;">
                   <span><strong>{edu.degree}</strong>, {edu.institution}</span>
-                  <span>{edu.period}</span>
+                  <span style="color: #666; font-size: 9pt;">{edu.period}</span>
                 </div>
                 """
 
@@ -986,9 +1098,10 @@ class TemplateEngine:
   .paper, .resume-paper {{ max-width: 820px; margin: 0 auto; background: #fff; padding: 40px 50px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }}
   h1, .name {{ text-align: center; font-size: 24pt; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }}
   .title, .title-tagline {{ text-align: center; font-size: 11pt; font-style: italic; margin-bottom: 4px; }}
-  .contacts {{ text-align: center; font-size: 9.5pt; border-bottom: 1px solid #222; padding-bottom: 12px; margin-bottom: 18px; }}
-  .sec-heading, .section-title {{ font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #aaa; padding-bottom: 2px; margin: 16px 0 10px 0; letter-spacing: 0.5px; }}
-  @media print {{ body {{ background: #fff; padding: 0; }} .paper, .resume-paper {{ box-shadow: none; padding: 0; }} }}
+  .contacts {{ text-align: center; font-size: 9.5pt; border-bottom: 2px solid #222; padding-bottom: 12px; margin-bottom: 18px; }}
+  .sec-heading, .section-title {{ font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1.5px solid #222; padding-bottom: 3px; margin: 18px 0 10px 0; letter-spacing: 0.8px; }}
+  .experience-entry:last-child, .project-card:last-child {{ border-bottom: none !important; padding-bottom: 0 !important; }}
+  @media print {{ body {{ background: #fff; padding: 0; }} .paper, .resume-paper {{ box-shadow: none; padding: 0; }} .experience-entry, .project-card {{ border-bottom-color: #ccc !important; }} }}
   del.git-diff-del {{
     background-color: #ffebe9 !important;
     color: #cf222e !important;
