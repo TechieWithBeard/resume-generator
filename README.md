@@ -93,7 +93,7 @@ The built-in audit engine ([backend/app/services/resume_score_checker.py](backen
 |                                                                                               |
 |  VISHNU THANKAPPAN                                                                            |
 |  Senior Frontend Engineer                                                                     |
-|  📞 +918373923785  ✉ vishnut071@gmail.com  💻 https://github.com/TechieWithBeard  📍 India     |
+|  📞 +1 (555) 019-2834  ✉ vishnut071@gmail.com  💻 https://github.com/TechieWithBeard  📍 India   |
 +-----------------------------------------------------------------------------------------------+
 |  LEFT COLUMN (~62%)                                 |  RIGHT COLUMN (~38%)                    |
 |                                                     |                                         |
