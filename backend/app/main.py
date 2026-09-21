@@ -305,6 +305,65 @@ async def app(scope, receive, send):
         await send({"type": "http.response.body", "body": b"", "more_body": False})
         return
 
+    # Route: GET /api/evals/cases
+    if path == "/api/evals/cases" and method == "GET":
+        from backend.app.evals import BENCHMARK_DATASET
+        cases_meta = [
+            {
+                "id": c.id,
+                "name": c.name,
+                "description": c.description,
+                "document_type": c.document_type,
+                "target_title": c.job_input.target_title,
+                "tags": c.tags,
+                "minimum_match_score": c.minimum_match_score,
+            }
+            for c in BENCHMARK_DATASET
+        ]
+        status, headers, body = send_json({"cases": cases_meta, "total": len(cases_meta)})
+        await send({"type": "http.response.start", "status": status, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+        return
+
+    # Route: POST /api/evals/run
+    if path == "/api/evals/run" and method == "POST":
+        from backend.app.evals import BENCHMARK_DATASET, evaluator
+        raw = await read_body(receive)
+        case_id = None
+        provider = "heuristic"
+        if raw:
+            try:
+                data = json.loads(raw.decode("utf-8"))
+                case_id = data.get("case_id")
+                provider = data.get("provider", "heuristic")
+            except Exception:
+                pass
+
+        cases = BENCHMARK_DATASET
+        if case_id:
+            cases = [c for c in BENCHMARK_DATASET if c.id == case_id]
+
+        report = await evaluator.evaluate_suite(
+            cases=cases,
+            config=LLMConfig(provider=provider),
+        )
+        status, headers, body = send_json(report.model_dump())
+        await send({"type": "http.response.start", "status": status, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+        return
+
+    # Route: GET /api/evals/latest
+    if path == "/api/evals/latest" and method == "GET":
+        from backend.app.evals import evaluator
+        report = evaluator.latest_report
+        if report:
+            status, headers, body = send_json(report.model_dump())
+        else:
+            status, headers, body = send_json({"message": "No evaluation run recorded yet. POST /api/evals/run to execute."}, status=404)
+        await send({"type": "http.response.start", "status": status, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+        return
+
     # Static file serving for Angular frontend
     dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist", "frontend", "browser"))
     if not path.startswith("/api") and os.path.isdir(dist_dir):

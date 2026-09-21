@@ -488,7 +488,13 @@ class GeneratorChain:
         )
         if comp_match:
             candidate_comp = comp_match.group(1).strip()
-            if len(candidate_comp) > 1 and not any(k in candidate_comp.lower() for k in ["engineer", "developer", "senior"]):
+            prefix = job_text[:comp_match.start()].lower()
+            # If preceded by "worked", "experience", "previously", "prior", or contains " or ", it's not the target hiring company
+            is_prior_employer = any(marker in prefix[-40:] for marker in ["worked", "previously", "prior", "experience", "alumni", "history"])
+            is_disjunctive = " or " in candidate_comp.lower() or "/" in candidate_comp
+            is_generic = any(k in candidate_comp.lower() for k in ["engineer", "developer", "senior", "lead", "architect", "scientist", "manager"])
+            
+            if len(candidate_comp) > 1 and not is_generic and not is_prior_employer and not is_disjunctive:
                 company = candidate_comp
 
         # 2. Location Extraction
