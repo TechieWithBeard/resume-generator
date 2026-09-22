@@ -265,6 +265,9 @@ npm start
 
 # Or build production bundle
 npm run build
+
+# Run Playwright E2E & Component test suites
+npm run test:e2e
 ```
 
 ---

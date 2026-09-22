@@ -222,6 +222,7 @@ __marimo__/
 backend/data/my_resume.json
 backend/data/default_base_resume.json
 backend/data/personal_*.json
+backend/data/template_config.json
 .env
 .env.*
 !.env.example
