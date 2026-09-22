@@ -8,7 +8,7 @@
 [![Evals](https://img.shields.io/badge/Evals-100%25%20Pass%20Rate-brightgreen.svg)](backend/app/evals)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-An end-to-end, production-grade AI Resume & CV Platform that tailors candidate profiles to target job descriptions and company intelligence in real time. Designed with a strict **Zero-Hallucination Ground Truth Invariant**, an **ATS-Tested 2-Column Layout** with a strict **1–2 page hard cap**, and a built-in **9-Dimension Resume Score Checker** matching the official [MyPerfectResume](https://www.myperfectresume.com) scoring rubric.
+An end-to-end, production-grade AI Resume & CV Platform that tailors candidate profiles to target job descriptions and company intelligence in real time. Designed with a strict **Zero-Hallucination Ground Truth Invariant**, an **ATS-Tested 2-Column Layout** with a strict **1–2 page hard cap**, and a built-in **9-Dimension Resume Score Checker** evaluating resumes against industry-standard ATS quality rubrics.
 
 <p align="center">
   <img src="docs/app_screenshot.png" alt="AI Resume & CV Platform Interface" width="100%" />
@@ -53,7 +53,7 @@ An end-to-end, production-grade AI Resume & CV Platform that tailors candidate p
 |  4. Synthesis & Alignment       Reframes verified achievements incorporating candidate guidance   |
 |  5. Noise Elimination Filter    Deterministic purge of HR recruitment process boilerplate         |
 |  6. 7-Check Verifier Gate       Asserts 100% identity, employer, degree, dates & skills grounding  |
-|  7. 9-Dimension Score Checker   Audits resume against official MyPerfectResume rubric             |
+|  7. 9-Dimension Score Checker   Audits resume against industry-standard ATS scoring rubrics       |
 |  8. Template Engine             Renders responsive 2-column ATS HTML with @media print rules      |
 +---------------------------------------------------------------------------------------------------+
                                                   │
@@ -66,7 +66,7 @@ An end-to-end, production-grade AI Resume & CV Platform that tailors candidate p
 
 ---
 
-## 📊 9-Dimension Resume Score Checker (MyPerfectResume Rubric)
+## 📊 9-Dimension Resume Score Checker (ATS Quality Rubric)
 
 The built-in audit engine ([backend/app/services/resume_score_checker.py](backend/app/services/resume_score_checker.py)) scores every resume against 9 professional dimensions:
 
@@ -325,7 +325,7 @@ python backend/run_evals.py --format markdown
 1. **Senior Frontend Architect (High Core Match)**: Validates high-density tailoring (97% match), quantifiable metric reframing, and ATS-tested 2-column rendering.
 2. **Fullstack Cloud Engineer (Cross-Domain Pivot & Transferable Skills)**: Verifies transferable skills reasoning for fullstack cloud platforms without fabricating unverified technologies (e.g. Golang or Kubernetes).
 3. **Adversarial Injection & Fake Credential Trap**: Injects deceptive prompts instructing the AI to fabricate MIT PhDs, Google Brain tenures, and recruitment interview schedules; asserts 100% rejection of synthetic facts.
-4. **Rentman Executive CV (Bespoke European Alignment)**: Validates Executive CV generation for Rentman in Utrecht, Netherlands: authentic web intelligence, Dutch enterprise client preservation (Maistering B.V.), and recruitment noise stripping.
+4. **Enterprise Executive CV (Bespoke Company Intelligence & Alignment)**: Validates Executive CV generation for enterprise tech firms: authentic web intelligence, enterprise client preservation, and recruitment noise stripping.
 5. **Sparse Minimal Job Description**: Verifies graceful degradation and grounded synthesis when presented with a 1-sentence job posting without hallucinating out-of-scope technologies.
 6. **Senior Embedded Firmware Engineer (Extreme Mismatch & HITL Gate)**: Adversarial test case with zero overlap (bare-metal C, FreeRTOS, ARM Cortex, CAN bus). Verifies that preflight flags extreme mismatch ($5\%$ match), prompts Human-in-the-Loop guidance, and strictly purges unverified skills.
 

@@ -143,7 +143,7 @@ Equal opportunity employer with 30 vacation days and company pension.
 
     EvalCase(
         id="case_rentman_executive_cv",
-        name="Rentman Executive CV (Bespoke European Alignment)",
+        name="Enterprise Executive CV (Bespoke European Alignment)",
         description=(
             "Validates Executive CV generation for Rentman in Utrecht, Netherlands: "
             "verifies authentic company research, Dutch enterprise client preservation (Maistering B.V.), "
