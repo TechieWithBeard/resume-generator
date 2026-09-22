@@ -379,6 +379,26 @@ class TestResumeGenerator(unittest.TestCase):
         self.assertIn("Portfolio", html_cv)
         self.assertNotIn('href="linkedin/', html_cv)
 
+    def test_company_extraction_clean_name(self):
+        """Ensures company extraction extracts concise company names and avoids sentence leakage."""
+        lely_jd = """At Lely, we develop software that helps automate dairy farms and supports farmers in their daily work.
+Working at Lely means contributing to sustainable progress within one of the most innovative organizations in the Netherlands.
+About Lely
+Founded in 1948, Lely is committed to a sustainable, profitable, and enjoyable future in agriculture."""
+        keywords, role, company, loc = generator_chain._extract_job_keywords(lely_jd, target_title=None)
+        self.assertEqual(company, "Lely")
+
+        aligned = generator_chain._align_resume_heuristically(
+            self.sample_base,
+            generator_chain._perform_competency_audit(self.sample_base, keywords, role),
+            target_role="Angular Front-End Developer",
+            company=company,
+        )
+        self.assertEqual(aligned.target_company, "Lely")
+        self.assertIn("Aligned for Lely", aligned.tagline)
+        self.assertNotIn("means contributing", aligned.tagline)
+        self.assertNotIn("means contributing", aligned.summary)
+
 
 if __name__ == "__main__":
     unittest.main()

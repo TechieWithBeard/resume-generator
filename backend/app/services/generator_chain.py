@@ -518,20 +518,59 @@ class GeneratorChain:
 
         # 1. Company Extraction
         company = None
-        comp_match = re.search(
-            r"(?:at|@)\s+([A-Z][A-Za-z0-9\.\s&]+?)(?:\s*(?:—|–|-|\||,|\sin\s|\sat\s|\n|$))",
+
+        # Priority 1: High-confidence sections like "About <Company>", "Life at <Company>", "Careers at <Company>"
+        about_match = re.search(
+            r"\b(?:About|Life at|Careers at|Welcome to)\s+([A-Z][A-Za-z0-9\.\s&]+?)(?:\s*(?:\n|—|–|-|\||,|\.|\:|$))",
             job_text
         )
-        if comp_match:
-            candidate_comp = comp_match.group(1).strip()
-            prefix = job_text[:comp_match.start()].lower()
-            # If preceded by "worked", "experience", "previously", "prior", or contains " or ", it's not the target hiring company
-            is_prior_employer = any(marker in prefix[-40:] for marker in ["worked", "previously", "prior", "experience", "alumni", "history"])
-            is_disjunctive = " or " in candidate_comp.lower() or "/" in candidate_comp
-            is_generic = any(k in candidate_comp.lower() for k in ["engineer", "developer", "senior", "lead", "architect", "scientist", "manager"])
-            
-            if len(candidate_comp) > 1 and not is_generic and not is_prior_employer and not is_disjunctive:
-                company = candidate_comp
+        if about_match:
+            cand = about_match.group(1).strip()
+            if 1 < len(cand) <= 40 and len(cand.split()) <= 4:
+                company = cand
+
+        # Priority 2: Sentence starter "At <Company>, we / you / our" or "Join <Company>"
+        if not company:
+            intro_match = re.search(
+                r"(?:^|\n|[\.\?!]\s+)(?:At|Join)\s+([A-Z][A-Za-z0-9\.\s&]+?)(?:,\s*|\s+(?:we|you|our|is|are|develop|build|create|help|empower|deliver)\b)",
+                job_text
+            )
+            if intro_match:
+                cand = intro_match.group(1).strip()
+                if 1 < len(cand) <= 40 and len(cand.split()) <= 4:
+                    company = cand
+
+        # Priority 3: "at/working at <Company>" stopping before punctuation, prepositions, or sentence verbs
+        if not company:
+            stopwords = r"\b(?:is|are|was|were|means|develops|helps|offers|values|provides|creates|builds|delivers|aims|strives|we|you|our|that|which|who|where)\b"
+            comp_match = re.search(
+                r"\b(?:at|@)\s+([A-Z][A-Za-z0-9\.\s&]+?)(?:\s*(?:—|–|-|\||,|\.|\:|\sin\s|\sat\s|" + stopwords + r"|\n|$))",
+                job_text
+            )
+            if comp_match:
+                cand = comp_match.group(1).strip()
+                prefix = job_text[:comp_match.start()].lower()
+                is_prior = any(m in prefix[-40:] for m in ["worked", "previously", "prior", "experience", "alumni", "history"])
+                is_disjunctive = " or " in cand.lower() or "/" in cand
+                is_generic = any(k in cand.lower() for k in ["engineer", "developer", "senior", "lead", "architect", "scientist", "manager", "team", "scale"])
+                if 1 < len(cand) <= 40 and len(cand.split()) <= 4 and not is_generic and not is_prior and not is_disjunctive:
+                    company = cand
+
+        # Priority 4: Headline match e.g. "Senior Engineer at Acme Corp"
+        if not company:
+            headline_match = re.search(
+                r"(?:Developer|Engineer|Architect|Lead|Manager)\s+(?:at|@)\s+([A-Z][A-Za-z0-9\.\s&]+?)(?:\s*(?:—|–|-|\||,|\.|\n|$))",
+                job_text,
+                re.I
+            )
+            if headline_match:
+                cand = headline_match.group(1).strip()
+                if 1 < len(cand) <= 40 and len(cand.split()) <= 4:
+                    company = cand
+
+        if company:
+            company = re.sub(r"[\.,;:—–\-\|]+$", "", company).strip()
+            company = re.sub(r"\s+(?:in|at|and|or|for|with)$", "", company, flags=re.I).strip()
 
         # 2. Location Extraction
         location = None
