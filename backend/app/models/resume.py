@@ -37,6 +37,15 @@ class ProjectItem(BaseModel):
     period: Optional[str] = None
     url: Optional[str] = None
 
+    @field_validator("url", mode="before")
+    def sanitize_url(cls, v):
+        if not v or not isinstance(v, str):
+            return None
+        v_clean = v.strip()
+        if v_clean.lower() in ("https:", "https://", "http:", "http://", "https", "http", "#"):
+            return None
+        return v_clean
+
 
 class CertificationItem(BaseModel):
     name: str
@@ -45,6 +54,15 @@ class CertificationItem(BaseModel):
     date: Optional[str] = None
     credential_id: Optional[str] = None
     url: Optional[str] = None
+
+    @field_validator("url", mode="before")
+    def sanitize_url(cls, v):
+        if not v or not isinstance(v, str):
+            return None
+        v_clean = v.strip()
+        if v_clean.lower() in ("https:", "https://", "http:", "http://", "https", "http", "#"):
+            return None
+        return v_clean
 
 
 class ResumeData(BaseModel):

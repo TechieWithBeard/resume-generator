@@ -329,6 +329,15 @@ class TemplateEngine:
         {config.custom_css or ""}
         """
 
+    def _is_valid_url(self, url: Optional[str]) -> bool:
+        """Checks if a URL has a genuine protocol and valid domain structure."""
+        if not url:
+            return False
+        u = str(url).strip()
+        if u.lower() in ("https:", "https://", "http:", "http://", "https", "http", "#"):
+            return False
+        return bool(re.match(r"^https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", u, re.IGNORECASE))
+
     def _format_url(self, url: Optional[str], platform: str = "") -> Tuple[str, str]:
         """
         Returns (href, display_label).
@@ -614,7 +623,6 @@ class TemplateEngine:
         if show_proj and valid_projects:
             p_entries = []
             for proj in valid_projects:
-                url_link = f' <a href="{proj.url}" target="_blank" class="proj-link" title="Open Link">↗</a>' if proj.url and "github.com/TechieWithBeard" not in proj.url else ''
                 period_str = f'<div class="exp-meta"><span class="meta-icon">📅</span> {proj.period}</div>' if proj.period else ''
                 base_p_desc = base_projects_by_name.get(proj.name.strip().lower(), "")
                 rendered_p_desc = (
@@ -637,7 +645,7 @@ class TemplateEngine:
 
                 p_entries.append(f"""
                 <div class="project-entry">
-                    <div class="exp-role">{proj.name}{url_link}</div>
+                    <div class="exp-role">{proj.name}</div>
                     {tech_sub}
                     {period_str}
                     {f'<ul class="exp-highlights">{p_bullets}</ul>' if p_bullets else ''}
@@ -726,7 +734,7 @@ class TemplateEngine:
             cert_entries = ""
             for cert in resume.certifications:
                 yr = f" ({cert.year})" if cert.year else ""
-                url_str = f' <a href="{cert.url}" target="_blank" style="color:var(--accent-color); text-decoration:none;">🔗</a>' if cert.url else ""
+                url_str = f' <a href="{cert.url}" target="_blank" style="color:var(--accent-color); text-decoration:none;">🔗</a>' if self._is_valid_url(cert.url) else ""
                 cert_entries += f"""
                 <div class="side-entry">
                     <div class="side-entry-title">{cert.name}</div>
@@ -1324,7 +1332,6 @@ class TemplateEngine:
         if show_proj and valid_projects:
             for proj in valid_projects:
                 techs = f" — <em>{', '.join(proj.technologies)}</em>" if proj.technologies else ""
-                url_s = f' <a href="{proj.url}" target="_blank">🔗</a>' if (proj.url and not proj.url.endswith("TechieWithBeard")) else ""
                 period_s = f" ({proj.period})" if proj.period else ""
                 base_p_desc = base_projects_by_name.get(proj.name.strip().lower(), "")
                 rendered_p_desc = (
@@ -1334,7 +1341,7 @@ class TemplateEngine:
                 )
                 projects_html += f"""
                 <div class="project-card" style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb;">
-                  <div><strong class="project-name">{proj.name}</strong>{period_s}{url_s}{techs}</div>
+                  <div><strong class="project-name">{proj.name}</strong>{period_s}{techs}</div>
                   <p class="project-highlights" style="margin: 2px 0 6px 0;">{rendered_p_desc}</p>
                 </div>
                 """
@@ -1355,7 +1362,7 @@ class TemplateEngine:
         if show_cert and getattr(resume, "certifications", None):
             for cert in resume.certifications:
                 yr = f" ({cert.year})" if cert.year else ""
-                url_str = f' <a href="{cert.url}" target="_blank">🔗</a>' if cert.url else ""
+                url_str = f' <a href="{cert.url}" target="_blank">🔗</a>' if self._is_valid_url(cert.url) else ""
                 cert_html += f'<div style="font-size: 9.5pt; margin-bottom: 4px;"><strong>{cert.name}</strong> — {cert.issuer}{yr}{url_str}</div>'
 
         tagline_html = f" • {resume.tagline}" if (config is None or config.show_tagline) and resume.tagline else ""
@@ -1670,7 +1677,6 @@ class TemplateEngine:
         for p in valid_cv_projects:
             p_role = f'<span class="case-study-role">{p.role}</span>' if p.role else ""
             p_period = f'<span class="entry-period">{p.period}</span>' if p.period else ""
-            url_link = f' <a href="{p.url}" target="_blank" class="entry-link">↗ Link</a>' if (p.url and not p.url.endswith("TechieWithBeard")) else ""
             tech_badges = ""
             if p.technologies:
                 badges = "".join([f'<span class="tech-badge">{t}</span>' for t in p.technologies])
@@ -1692,7 +1698,6 @@ class TemplateEngine:
                     <div class="case-study-title-group">
                         <span class="entry-title">{p.name}</span>
                         {f'<span class="entry-sep">|</span> {p_role}' if p_role else ''}
-                        {url_link}
                     </div>
                     {p_period}
                 </div>

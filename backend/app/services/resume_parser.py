@@ -432,9 +432,9 @@ class ResumeParserService:
             "'backendSystems', 'cloudDevOps', 'aiAndData', 'testingAndQuality', 'toolsAndWorkflow'). Do not filter out any real skills.\n"
             "3. PRESERVE GROUND TRUTH: Keep real company names, job titles, employment dates, locations, and academic degrees intact.\n"
             "4. EXTRACT PROJECTS & CASE STUDIES: If the resume contains projects, personal/open-source work, or architectural case studies, "
-            "extract each into the 'projects' array with name, description, technologies, role, period, and url.\n"
+            "extract each into the 'projects' array with name, description, technologies, role, period, and url (leave url null unless an explicit, valid public URL is stated in text).\n"
             "5. EXTRACT CERTIFICATIONS: If certifications, licenses, or credentials are listed, extract into the 'certifications' array "
-            "with name, issuer, year/date, credential_id, and url.\n"
+            "with name, issuer, year/date, credential_id, and url (leave url null unless an explicit verification URL is provided).\n"
             "6. EXTRACT PUBLICATIONS: If whitepapers, articles, or talks are listed, extract into 'publications'.\n"
             "7. OUTPUT FORMAT: Output ONLY the valid JSON block enclosed within ```json ... ``` code fences.\n\n"
             "JSON SCHEMA:\n"
@@ -485,7 +485,7 @@ class ResumeParserService:
             '      "period": "Years",\n'
             '      "description": "Comprehensive project description",\n'
             '      "technologies": ["Angular", "Nx", ...],\n'
-            '      "url": "https://..."\n'
+            '      "url": null\n'
             '    }\n'
             '  ],\n'
             '  "certifications": [\n'
@@ -494,7 +494,7 @@ class ResumeParserService:
             '      "issuer": "Issuing Body",\n'
             '      "year": "Year",\n'
             '      "credential_id": "Credential ID if present",\n'
-            '      "url": "Verification URL"\n'
+            '      "url": null\n'
             '    }\n'
             '  ],\n'
             '  "publications": ["Publication or Talk 1", ...],\n'
