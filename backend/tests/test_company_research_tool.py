@@ -4,6 +4,7 @@ Unit tests for the LangChain CompanyResearchTool and Bespoke CV features.
 
 import asyncio
 import unittest
+from unittest.mock import patch
 from langchain_core.tools import BaseTool
 
 from backend.app.models.resume import ResumeData
@@ -41,29 +42,54 @@ class TestCompanyResearchTool(unittest.TestCase):
             "We are seeking a Senior Frontend Architect."
         )
 
-        result = tool.invoke({
-            "company_name": "Siemens Healthineers GmbH",
-            "job_context": sample_jd,
-        })
+        with patch.object(tool, "_fetch_wikipedia", return_value=None), \
+             patch.object(tool, "_fetch_duckduckgo", return_value=None), \
+             patch.object(tool, "_fetch_ddgs", return_value=None):
+            result = tool.invoke({
+                "company_name": "Siemens Healthineers GmbH",
+                "job_context": sample_jd,
+            })
 
-        self.assertIsInstance(result, dict)
-        self.assertIn("company_name", result)
-        self.assertEqual(result["company_name"], "Siemens Healthineers")
-        self.assertTrue(len(result["mission"]) > 10)
-        self.assertTrue(len(result["culture"]) > 10)
-        self.assertTrue(len(result["tech_focus"]) > 10)
-        self.assertIn("summary", result)
-        self.assertIn("healthcare", result["summary"].lower())
+            self.assertIsInstance(result, dict)
+            self.assertIn("company_name", result)
+            self.assertEqual(result["company_name"], "Siemens Healthineers")
+            self.assertTrue(len(result["mission"]) > 10)
+            self.assertTrue(len(result["culture"]) > 10)
+            self.assertTrue(len(result["tech_focus"]) > 10)
+            self.assertIn("summary", result)
+            self.assertIn("healthcare", result["summary"].lower())
+
+    def test_web_wikipedia_synthesis(self):
+        """Verifies synthesis when Wikipedia returns company extract."""
+        tool = CompanyResearchTool()
+        with patch.object(
+            tool,
+            "_fetch_wikipedia",
+            return_value={
+                "extract": "Siemens Healthineers is a German company specializing in medical technology.",
+                "description": "Medical technology company",
+                "source": "web_wikipedia",
+            },
+        ):
+            result = tool.invoke({
+                "company_name": "Siemens Healthineers GmbH",
+                "job_context": "About us: Pioneering medical innovations.",
+            })
+            self.assertEqual(result["company_name"], "Siemens Healthineers")
+            self.assertIn("medical technology", result["summary"].lower())
 
     def test_generic_fallback_when_empty_context(self):
         """Verifies graceful synthetic brief generation when offline and context is empty."""
         tool = CompanyResearchTool()
-        result = tool.invoke({"company_name": "Acme Innovations", "job_context": ""})
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result["company_name"], "Acme Innovations")
-        self.assertTrue(len(result["mission"]) > 0)
-        self.assertTrue(len(result["culture"]) > 0)
-        self.assertTrue(len(result["summary"]) > 0)
+        with patch.object(tool, "_fetch_wikipedia", return_value=None), \
+             patch.object(tool, "_fetch_duckduckgo", return_value=None), \
+             patch.object(tool, "_fetch_ddgs", return_value=None):
+            result = tool.invoke({"company_name": "Acme Innovations", "job_context": ""})
+            self.assertIsInstance(result, dict)
+            self.assertEqual(result["company_name"], "Acme Innovations")
+            self.assertTrue(len(result["mission"]) > 0)
+            self.assertTrue(len(result["culture"]) > 0)
+            self.assertTrue(len(result["summary"]) > 0)
 
     def test_async_ainvoke(self):
         """Verifies async ainvoke works correctly."""
