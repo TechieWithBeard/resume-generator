@@ -27,6 +27,13 @@ export class JobInputComponent {
   readonly selectedStrategy = signal<'transferable' | 'strict_factual'>('transferable');
   readonly candidateNotes = signal<string>('');
 
+  // Message to the Hiring Team Signals
+  readonly isGeneratingNote = signal<boolean>(false);
+  readonly showHiringNoteModal = signal<boolean>(false);
+  readonly hiringNote = signal<{ note: string; target_company: string; target_role: string; word_count: number; char_count: number } | null>(null);
+  readonly editedNote = signal<string>('');
+  readonly noteCopied = signal<boolean>(false);
+
   linkedinUrl = '';
   jobDescription = '';
   targetTitle = '';
@@ -126,5 +133,44 @@ export class JobInputComponent {
 
   cancelMismatch(): void {
     this.showMismatchModal.set(false);
+  }
+
+  async onGenerateHiringNote(): Promise<void> {
+    if (!this.canGenerate()) return;
+    this.isGeneratingNote.set(true);
+    try {
+      const res = await this.resumeService.generateHiringNote({
+        job_description: this.jobDescription,
+        linkedin_url: this.linkedinUrl,
+        target_title: this.targetTitle || undefined,
+        document_type: this.documentMode(),
+      });
+      if (res && res.note) {
+        this.hiringNote.set(res);
+        this.editedNote.set(res.note);
+        this.noteCopied.set(false);
+        this.showHiringNoteModal.set(true);
+      }
+    } catch (err) {
+      console.error('Failed to generate hiring note:', err);
+    } finally {
+      this.isGeneratingNote.set(false);
+    }
+  }
+
+  async copyNoteToClipboard(): Promise<void> {
+    const textToCopy = this.editedNote() || this.hiringNote()?.note || '';
+    if (!textToCopy) return;
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      this.noteCopied.set(true);
+      setTimeout(() => this.noteCopied.set(false), 2500);
+    } catch (e) {
+      console.warn('Failed to copy to clipboard via navigator:', e);
+    }
+  }
+
+  closeHiringNoteModal(): void {
+    this.showHiringNoteModal.set(false);
   }
 }

@@ -538,6 +538,73 @@ React, Redux, Node.js, JavaScript, Cloud, CI/CD, Agile.
         self.assertIn("class=\"exp-highlights\"", html_real)
         self.assertIn("<li", html_real)
 
+    def test_generate_hiring_note(self):
+        """Verifies generate_hiring_note generates authentic, concise notes for hiring team / LinkedIn Easy Apply."""
+        import asyncio
+        from backend.app.models.resume import JobInput
+
+        job_input = JobInput(
+            job_description="We are looking for a Senior Frontend Architect at Lely to lead automated farm robotics software.",
+            target_title="Senior Frontend Architect",
+        )
+
+        async def run_test():
+            res = await generator_chain.generate_hiring_note(job_input, self.sample_base)
+            self.assertTrue(res["success"])
+            self.assertIn("Lely", res["note"])
+            self.assertIn("Senior Frontend Architect", res["note"])
+            self.assertIn(self.sample_base.name, res["note"])
+            self.assertGreater(res["word_count"], 60)
+            self.assertLess(res["word_count"], 300)
+
+        asyncio.run(run_test())
+
+    def test_asgi_generate_hiring_note_endpoint(self):
+        """Verifies ASGI route POST /api/generate/hiring-note returns 200 with valid note."""
+        import asyncio
+        import json
+        from backend.app.main import app
+
+        async def run_asgi():
+            body = json.dumps({
+                "job_input": {
+                    "job_description": "Software Engineer at Walmart International. Requirements: JavaScript, cloud, architecture.",
+                    "target_title": "Software Engineer",
+                },
+                "base_resume": self.sample_base.model_dump(),
+            }).encode("utf-8")
+
+            scope = {
+                "type": "http",
+                "method": "POST",
+                "path": "/api/generate/hiring-note",
+                "headers": [(b"content-type", b"application/json")],
+            }
+
+            response_status = None
+            response_body = b""
+
+            async def receive():
+                return {"type": "http.request", "body": body, "more_body": False}
+
+            async def send(message):
+                nonlocal response_status, response_body
+                if message["type"] == "http.response.start":
+                    response_status = message["status"]
+                elif message["type"] == "http.response.body":
+                    response_body += message.get("body", b"")
+
+            await app(scope, receive, send)
+
+            self.assertEqual(response_status, 200)
+            data = json.loads(response_body.decode("utf-8"))
+            self.assertTrue(data.get("success"))
+            self.assertIn("note", data)
+            self.assertIn("Walmart", data["note"])
+            self.assertGreater(data["word_count"], 50)
+
+        asyncio.run(run_asgi())
+
 
 if __name__ == "__main__":
     unittest.main()

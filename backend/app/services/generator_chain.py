@@ -543,7 +543,7 @@ class GeneratorChain:
 
         # Priority 3: "at/working at <Company>" stopping before punctuation, prepositions, or sentence verbs
         if not company:
-            stopwords = r"\b(?:is|are|was|were|means|develops|helps|offers|values|provides|creates|builds|delivers|aims|strives|we|you|our|that|which|who|where)\b"
+            stopwords = r"\b(?:to|for|is|are|was|were|means|develops|helps|offers|values|provides|creates|builds|delivers|aims|strives|we|you|our|that|which|who|where)\b"
             comp_match = re.search(
                 r"\b(?:at|@)\s+([A-Z][A-Za-z0-9\.\s&]+?)(?:\s*(?:—|–|-|\||,|\.|\:|\sin\s|\sat\s|" + stopwords + r"|\n|$))",
                 job_text
@@ -1081,6 +1081,148 @@ class GeneratorChain:
             f"optimizing performance, and executing your platform roadmap with confidence."
         )
         return f"{p1}\n\n{p2}"
+
+    def _compose_hiring_team_message(
+        self,
+        company: Optional[str],
+        target_role: str,
+        base: ResumeData,
+        audit: AlignmentReport,
+        company_research: Optional[Dict[str, Any]] = None,
+        human_guidance: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """
+        Synthesizes a high-impact, authentic, concise note (140-200 words) for the hiring team
+        explaining why the candidate is interested in working there and how their verified background delivers immediate value.
+        Perfect for LinkedIn Easy Apply 'Message to the hiring team' and application cover notes.
+        """
+        clean_comp = (company_research.get("company_name") if company_research else None) or company or "your team"
+        culture = (company_research.get("culture") if company_research else None) or "engineering excellence and high-velocity innovation"
+        mission = (company_research.get("mission") if company_research else None)
+
+        matched_str = ", ".join(audit.direct_matches[:3]) if audit.direct_matches else "modern software architecture and reactive web platforms"
+
+        # Paragraph 1: Authentic enthusiasm and alignment with company mission
+        p1 = f"Hi {clean_comp} Hiring Team,\n\nI am writing to express my strong enthusiasm for the {target_role} role at {clean_comp}."
+        if mission and len(mission.strip()) > 15:
+            clean_mission = mission.strip().rstrip(".")
+            if len(clean_mission) > 130:
+                clean_mission = clean_mission[:130].rsplit(" ", 1)[0]
+            p1 += f" I have been following {clean_comp}'s work in {clean_mission} and am particularly drawn to your focus on {culture}."
+        else:
+            p1 += f" I am drawn to {clean_comp}'s engineering culture, technical ambition, and focus on {culture}."
+
+        # Paragraph 2: Core verified track record & direct relevance
+        p2 = (
+            f"With over 7 years of engineering experience, my background centers on architecting resilient, high-scale "
+            f"web platforms, standardizing multi-app Nx monorepos (cutting CI/CD pipeline cycles by 25–35%), and publishing modular UI design systems. "
+            f"Having led enterprise modernizations and collaborated closely with European distributed teams, I bring deep hands-on mastery in {matched_str}."
+        )
+
+        # Paragraph 3: Why this role & excitement
+        p3 = (
+            f"What excites me most about {clean_comp} is the opportunity to solve meaningful scale challenges while upholding "
+            f"rigorous code quality and developer velocity. I would love to bring this high-ownership mindset to your team."
+        )
+
+        # Sign-off with contact details
+        contacts = []
+        if base.email:
+            contacts.append(base.email)
+        if base.linkedin:
+            clean_li = base.linkedin if "linkedin.com" in base.linkedin else f"linkedin.com/in/{base.linkedin.strip('/')}"
+            contacts.append(clean_li)
+        if getattr(base, "portfolio", None):
+            contacts.append(base.portfolio)
+
+        contact_line = " | ".join(contacts) if contacts else ""
+        signoff = f"Thank you for your time and consideration. I would welcome the opportunity to connect and discuss how my background aligns with your engineering goals.\n\nBest regards,\n{base.name}"
+        if contact_line:
+            signoff += f"\n{contact_line}"
+
+        return f"{p1}\n\n{p2}\n\n{p3}\n\n{signoff}"
+
+    async def generate_hiring_note(
+        self,
+        job_input: JobInput,
+        base_resume: ResumeData,
+        config: Optional[LLMConfig] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generates a concise, high-impact 'Message to the Hiring Team' tailored to the job description,
+        company, and candidate's verified background.
+        """
+        job_text = (job_input.job_description or "").strip()
+        keywords, target_role, target_company, target_location = self._extract_job_keywords(
+            job_text, job_input.target_title
+        )
+        audit = self._perform_competency_audit(base_resume, keywords, target_role)
+
+        company_research_data = None
+        if target_company:
+            try:
+                from backend.app.services.company_research import company_research_tool
+                tool_input = {"company_name": target_company, "job_context": job_text}
+                company_research_data = company_research_tool.invoke(tool_input)
+            except Exception:
+                pass
+
+        note_text = ""
+        llm = self._get_llm(config) if config else None
+        if llm:
+            try:
+                from langchain_core.messages import HumanMessage, SystemMessage
+                system_prompt = (
+                    "You are an expert Executive Career Strategist and Talent Acquisition Specialist. "
+                    "Your mission is to craft an authentic, compelling 'Message to the Hiring Team' "
+                    "(answering: 'Let the company know about your interest working there') with STRICT ZERO HALLUCINATION.\n\n"
+                    "STRICT CONSTRAINTS:\n"
+                    "1. Length: Exactly 140 to 200 words (fits LinkedIn Easy Apply & Greenhouse limits).\n"
+                    "2. Express genuine, specific interest in the target company's mission and engineering challenges.\n"
+                    "3. Highlight candidate's verified achievements (e.g. enterprise architecture, 25-35% CI/CD speedup, design systems, reliability) and directly connect them to the target role.\n"
+                    "4. STRICT ZERO HALLUCINATION: Only reference candidate's verified background. Never invent tools, skills, or employers.\n"
+                    "5. Output ONLY the raw plain text message with salutation and sign-off. Do not enclose in markdown code blocks."
+                )
+                user_msg = (
+                    f"TARGET ROLE: {target_role}\n"
+                    f"TARGET COMPANY: {target_company or 'Target Company'}\n"
+                    f"COMPANY MISSION & CULTURE: {company_research_data.get('mission', '') if company_research_data else ''} | {company_research_data.get('culture', '') if company_research_data else ''}\n"
+                    f"JOB SPECIFICATION EXCERPT:\n{job_text[:3000]}\n\n"
+                    f"CANDIDATE NAME: {base_resume.name}\n"
+                    f"CANDIDATE TOP VERIFIED SKILLS: {', '.join(audit.direct_matches[:6])}\n"
+                    f"CANDIDATE EMAIL: {base_resume.email or ''}\n"
+                    f"CANDIDATE LINKEDIN: {base_resume.linkedin or ''}\n"
+                    f"CANDIDATE PORTFOLIO: {getattr(base_resume, 'portfolio', '') or ''}\n"
+                )
+                res = await llm.ainvoke([SystemMessage(content=system_prompt), HumanMessage(content=user_msg)])
+                raw_res = (res.content if hasattr(res, "content") else str(res)).strip()
+                raw_res = re.sub(r"^```(?:text|markdown)?\s*", "", raw_res)
+                raw_res = re.sub(r"\s*```$", "", raw_res).strip()
+                if len(raw_res.split()) >= 80:
+                    note_text = raw_res
+            except Exception:
+                note_text = ""
+
+        if not note_text:
+            note_text = self._compose_hiring_team_message(
+                company=target_company,
+                target_role=target_role,
+                base=base_resume,
+                audit=audit,
+                company_research=company_research_data,
+                human_guidance=job_input.human_guidance,
+            )
+
+        words = len(note_text.split())
+        chars = len(note_text)
+        return {
+            "success": True,
+            "note": note_text,
+            "target_company": target_company or "Target Company",
+            "target_role": target_role,
+            "word_count": words,
+            "char_count": chars,
+        }
 
     async def _run_llm_alignment_stream(
         self,

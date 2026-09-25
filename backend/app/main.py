@@ -275,6 +275,27 @@ async def app(scope, receive, send):
         await send({"type": "http.response.body", "body": body})
         return
 
+    # Route: POST /api/generate/hiring-note (Quick note for hiring team / LinkedIn Easy Apply)
+    if path == "/api/generate/hiring-note" and method == "POST":
+        raw = await read_body(receive)
+        data = json.loads(raw.decode("utf-8")) if raw else {}
+        job_input_data = data.get("job_input", {})
+        job_input = JobInput.model_validate(job_input_data)
+        base_res_data = data.get("base_resume")
+        base_res = ResumeData.model_validate(base_res_data) if base_res_data else resume_store.get_base_resume()
+        llm_cfg_data = data.get("llm_config")
+        cfg = LLMConfig.model_validate(llm_cfg_data) if llm_cfg_data else None
+
+        result = await generator_chain.generate_hiring_note(
+            job_input=job_input,
+            base_resume=base_res,
+            config=cfg,
+        )
+        status, headers, body = send_json(result)
+        await send({"type": "http.response.start", "status": status, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+        return
+
     # Route: POST /api/generate/stream (Server-Sent Events)
     if path == "/api/generate/stream" and method == "POST":
         raw = await read_body(receive)

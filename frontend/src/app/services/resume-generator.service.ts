@@ -429,6 +429,40 @@ export class ResumeGeneratorService {
   }
 
   /**
+   * Generates a concise, high-impact 'Message to the Hiring Team' tailored to the job description
+   * explaining why the candidate is interested in working there (fits LinkedIn Easy Apply / Greenhouse).
+   */
+  async generateHiringNote(jobInput: JobInput): Promise<{
+    success: boolean;
+    note: string;
+    target_company: string;
+    target_role: string;
+    word_count: number;
+    char_count: number;
+  }> {
+    const payload = {
+      job_input: {
+        ...jobInput,
+        document_type: jobInput.document_type || this.documentMode(),
+      },
+      base_resume: this.baseResume(),
+      llm_config: this.llmConfig(),
+    };
+
+    const res = await fetch(`${this.API_BASE}/api/generate/hiring-note`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to generate message to hiring team (status ${res.status})`);
+    }
+
+    return await res.json();
+  }
+
+  /**
    * Starts Server-Sent Events (SSE) streaming pipeline.
    * Decodes streaming chunks in real-time, feeding signals reactively.
    */
