@@ -766,6 +766,7 @@ class TemplateEngine:
             </div>
             """
 
+        display_name = resume.name.title() if (resume.name and (resume.name.isupper() or resume.name.islower())) else resume.name
         display_title = format_job_title(resume.title)
         display_tagline = re.sub(r"\s*•?\s*Aligned for\s+[^•]+", "", resume.tagline or "", flags=re.IGNORECASE).strip(" •")
         tagline_html = f" • {display_tagline}" if (config is None or config.show_tagline) and display_tagline else ""
@@ -841,7 +842,6 @@ class TemplateEngine:
     color: var(--primary-color);
     letter-spacing: -0.3px;
     margin-bottom: 2px;
-    text-transform: uppercase;
     line-height: 1.15;
   }}
   .title-tagline {{
@@ -1172,7 +1172,7 @@ class TemplateEngine:
   </div>
   <div class="header">
     <div class="header-info">
-      <div class="name">{resume.name}</div>
+      <div class="name">{display_name}</div>
       {header_title_tagline_html}
     </div>
     <div class="contacts">{contact_html}</div>
@@ -1368,6 +1368,7 @@ class TemplateEngine:
                 url_str = f' <a href="{cert.url}" target="_blank">🔗</a>' if self._is_valid_url(cert.url) else ""
                 cert_html += f'<div style="font-size: 9.5pt; margin-bottom: 4px;"><strong>{cert.name}</strong> — {cert.issuer}{yr}{url_str}</div>'
 
+        display_name = resume.name.title() if (resume.name and (resume.name.isupper() or resume.name.islower())) else resume.name
         display_title = format_job_title(resume.title)
         display_tagline = re.sub(r"\s*•?\s*Aligned for\s+[^•]+", "", resume.tagline or "", flags=re.IGNORECASE).strip(" •")
         tagline_html = f" • {display_tagline}" if (config is None or config.show_tagline) and display_tagline else ""
@@ -1381,7 +1382,7 @@ class TemplateEngine:
 <style>
   body {{ font-family: "Georgia", Times, serif; color: #111; line-height: 1.4; padding: 0; margin: 0; background: transparent; }}
   .paper, .resume-paper {{ max-width: 840px; margin: 0 auto; background: #fff; padding: 36px 44px; box-shadow: 0 4px 24px -2px rgba(15, 23, 42, 0.12); border-radius: 6px; border: 1px solid #e2e8f0; }}
-  h1, .name {{ font-size: 24pt; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }}
+  h1, .name {{ font-size: 24pt; margin-bottom: 2px; letter-spacing: 0.5px; }}
   .title, .title-tagline {{ font-size: 11pt; font-style: italic; margin-bottom: 4px; }}
   .contacts {{ font-size: 9.5pt; border-bottom: 2px solid var(--primary-color); padding-bottom: 12px; margin-bottom: 18px; }}
   .sec-heading, .section-title {{ font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1.5px solid var(--primary-color); padding-bottom: 3px; margin: 18px 0 10px 0; letter-spacing: 0.8px; }}
@@ -1461,7 +1462,7 @@ class TemplateEngine:
   {diff_legend_html}
   <div class="header">
     <div class="header-info">
-      <h1 class="name">{resume.name}</h1>
+      <h1 class="name">{display_name}</h1>
       <div class="title-tagline">{display_title}{tagline_html}</div>
     </div>
     <div class="contacts">{contact_html}</div>
@@ -1791,6 +1792,7 @@ class TemplateEngine:
 
         current_date_str = datetime.now().strftime("%B %d, %Y")
 
+        display_name = resume.name.title() if (resume.name and (resume.name.isupper() or resume.name.islower())) else resume.name
         display_title = format_job_title(resume.title)
         display_tagline = re.sub(r"\s*•?\s*Aligned for\s+[^•]+", "", resume.tagline or "", flags=re.IGNORECASE).strip(" •")
         tagline_html = f" • {display_tagline}" if (config is None or config.show_tagline) and display_tagline else ""
@@ -2497,7 +2499,7 @@ class TemplateEngine:
   <header class="header">
     <div class="header-info">
       <div class="header-top-row">
-        <h1 class="name">{resume.name}</h1>
+        <h1 class="name">{display_name}</h1>
         <span class="header-doc-type">Curriculum Vitae</span>
       </div>
       <div class="title-tagline">{display_title}{tagline_html}</div>
@@ -2552,12 +2554,12 @@ class TemplateEngine:
 
   <div class="cv-signoff-block avoid-break">
     <div class="signoff-salutation">Respectfully submitted,</div>
-    <div class="signoff-name">{resume.name}</div>
+    <div class="signoff-name">{display_name}</div>
     <div class="signoff-title">{display_title or target_role}</div>
   </div>
 
   <footer class="cv-footer avoid-break">
-    <span>Curriculum Vitae &bull; {resume.name}</span>
+    <span>Curriculum Vitae &bull; {display_name}</span>
     <span>Tailored Application &bull; {target_company}</span>
   </footer>
 </div>

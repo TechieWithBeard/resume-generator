@@ -148,7 +148,7 @@ class ResumeData(BaseModel):
         if not v or not isinstance(v, str):
             return "Candidate Name"
         v_clean = v.strip()
-        if v_clean.isupper():
+        if v_clean.isupper() or v_clean.islower():
             return v_clean.title()
         return v_clean
 
