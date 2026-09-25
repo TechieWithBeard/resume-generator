@@ -142,6 +142,16 @@ class ResumeData(BaseModel):
     skills: Dict[str, List[str]] = Field(default_factory=dict)
     projects: List[ProjectItem] = Field(default_factory=list)
 
+    @field_validator("name", mode="before")
+    @classmethod
+    def sanitize_name(cls, v: Any) -> str:
+        if not v or not isinstance(v, str):
+            return "Candidate Name"
+        v_clean = v.strip()
+        if v_clean.isupper():
+            return v_clean.title()
+        return v_clean
+
     @field_validator("title", mode="before")
     @classmethod
     def sanitize_title(cls, v: Any) -> str:
