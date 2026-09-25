@@ -788,10 +788,12 @@ class GeneratorChain:
                 f"Harmonizing verified technical taxonomy across: {', '.join(audit.direct_matches[:6])}...\n",
             ]
         else:
+            recent_cos = self._extract_recent_companies(base)
+            co_context = f" ({recent_cos[0]})" if recent_cos else ""
             reasoning_steps = [
                 f"Analyzing role scope: Strategic alignment for {target_role}{company_phrase}...\n",
                 f"Mapping top verified competencies: {', '.join(audit.direct_matches[:5])}...\n",
-                f"Elevating high-scale enterprise experience (AVEVA Nx monorepo, 25–35% build speedups)...\n",
+                f"Elevating high-scale enterprise experience{co_context} and aligning core competencies...\n",
                 f"Synthesizing quantified achievements and harmonizing skill hierarchy...\n",
             ]
 
@@ -817,6 +819,118 @@ class GeneratorChain:
         )
         yield {"type": "heuristic_complete", "resume": tailored}
 
+    def _extract_experience_years(self, base: ResumeData) -> str:
+        """
+        Dynamically extracts or computes candidate's total years of experience from their profile.
+        Prioritizes explicit mention in base.summary, then calculates from base.experience periods.
+        """
+        if base.summary:
+            m = re.search(r"\b(\d+\+?\s*(?:years?|yrs?))\b", base.summary, re.IGNORECASE)
+            if m:
+                raw_match = m.group(1).strip()
+                if "+" not in raw_match:
+                    num_match = re.search(r"\d+", raw_match)
+                    if num_match:
+                        return f"{num_match.group(0)}+ years"
+                return raw_match
+
+        years: List[int] = []
+        has_present = False
+        for exp in base.experience:
+            if not exp.period:
+                continue
+            p_low = exp.period.lower()
+            if any(w in p_low for w in ["present", "current", "now"]):
+                has_present = True
+            found = [int(y) for y in re.findall(r"\b(19\d\d|20\d\d)\b", exp.period)]
+            years.extend(found)
+
+        if years:
+            min_y = min(years)
+            max_y = datetime.now().year if has_present else max(years)
+            diff = max_y - min_y
+            if diff >= 1:
+                return f"{diff}+ years"
+
+        return "extensive"
+
+    def _extract_recent_companies(self, base: ResumeData) -> List[str]:
+        """
+        Extracts clean names of candidate's most recent employers/clients from base.experience.
+        Handles client annotations like 'Parnasoft Technologies — Client: AVEVA'.
+        """
+        companies: List[str] = []
+        for exp in base.experience[:2]:
+            raw = (exp.company or "").strip()
+            if not raw:
+                continue
+            if "client:" in raw.lower():
+                client_part = re.split(r"client:\s*", raw, flags=re.IGNORECASE)[-1].strip()
+                clean_name = re.split(r"[-—|]", client_part)[0].strip()
+                if clean_name and clean_name not in companies:
+                    companies.append(clean_name)
+            else:
+                clean_name = re.split(r"[-—|]", raw)[0].strip()
+                if clean_name and clean_name not in companies:
+                    companies.append(clean_name)
+        return companies
+
+    def _extract_candidate_achievements(
+        self,
+        base: ResumeData,
+        audit: Optional[AlignmentReport] = None,
+        max_items: int = 2,
+    ) -> List[str]:
+        """
+        Extracts candidate's top authentic quantified achievements from base.experience.highlights,
+        prioritized by keyword match against the target job and quantified impact metrics.
+        """
+        if not base.experience:
+            return []
+
+        matched_terms = [m.lower() for m in (audit.direct_matches if audit else [])]
+        metric_regex = re.compile(r"(\d+%\+?|\d+x|\b\d+\b|slashed|reduced|increased|boosted|accelerated|cut\b|saved)", re.I)
+
+        scored_highlights: List[Tuple[int, str]] = []
+        seen = set()
+
+        for exp in base.experience:
+            for hl in exp.highlights:
+                clean_hl = hl.strip().rstrip(".")
+                if not clean_hl or clean_hl.lower() in seen:
+                    continue
+                seen.add(clean_hl.lower())
+
+                score = 0
+                hl_low = clean_hl.lower()
+                for term in matched_terms:
+                    if term in hl_low:
+                        score += 3
+                if metric_regex.search(clean_hl):
+                    score += 2
+
+                scored_highlights.append((score, clean_hl))
+
+        scored_highlights.sort(key=lambda x: x[0], reverse=True)
+        return [hl for _, hl in scored_highlights[:max_items]]
+
+    def _get_candidate_collaboration_scope(self, base: ResumeData) -> str:
+        """
+        Determines verified collaboration environment (European, international, or cross-functional)
+        grounded in candidate's authentic experience.
+        """
+        all_text = (base.summary or "") + " " + " ".join(
+            (exp.company or "") + " " + (exp.location or "") + " " + " ".join(exp.highlights)
+            for exp in base.experience
+        )
+        text_low = all_text.lower()
+        if any(w in text_low for w in ["europe", "european", "netherlands", "dutch", "germany", "london", "uk", "aveva", "maistering"]):
+            return "distributed European and international engineering teams"
+        elif any(w in text_low for w in ["international", "global", "distributed", "remote"]):
+            return "distributed, high-velocity engineering teams"
+        else:
+            return "cross-functional product and engineering teams"
+
     def _align_resume_heuristically(
         self,
         base: ResumeData,
@@ -837,42 +951,45 @@ class GeneratorChain:
         is_mismatch = audit.is_low_match or strategy in ("transferable", "strict_factual")
         company_phrase = f" for {company}" if company else ""
 
+        years_exp = self._extract_experience_years(base)
+        years_phrase = f"with {years_exp} of" if "+" in years_exp or "year" in years_exp else f"with {years_exp}"
+
         if is_mismatch:
             role_display = base.target_role or "Senior Software Engineer"
             transferable_note = f" Candidate focus: {notes}." if notes else ""
             if doc_type == "cv":
                 tailored_summary = (
-                    f"Versatile {role_display} with 7+ years of engineering leadership architecting resilient, high-scale "
+                    f"Versatile {role_display} {years_phrase} engineering leadership architecting resilient, high-scale "
                     f"systems and modern platforms{company_phrase}. Renowned for engineering agility, rigorous systems thinking, "
                     f"and rapid mastery of new paradigms. Proven record modernizing enterprise architectures, driving CI/CD optimizations, "
                     f"and delivering scalable software solutions across distributed international teams.{transferable_note}"
                 )
             else:
                 tailored_summary = (
-                    f"Accomplished {role_display} with 7+ years of deep expertise in software architecture, enterprise systems, "
+                    f"Accomplished {role_display} {years_phrase} deep expertise in software architecture, enterprise systems, "
                     f"and high-performance engineering. Known for technical agility, strict code quality, and proven capacity "
                     f"to adapt core architectural principles to complex technical challenges{company_phrase}.{transferable_note}"
                 )
         else:
-            top_matches = ", ".join(audit.direct_matches[:4]) if audit.direct_matches else "Angular, TypeScript, and Scalable UI Architecture"
+            top_matches = ", ".join(audit.direct_matches[:4]) if audit.direct_matches else "Scalable Architecture and Engineering Excellence"
+            achievements = self._extract_candidate_achievements(base, audit, max_items=2)
+            achieve_phrase = f" Proven track record: {'; '.join(achievements)}." if achievements else ""
+            collab_scope = self._get_candidate_collaboration_scope(base)
+
             if doc_type == "cv":
                 company_target = f" targeting {company}'s SaaS ecosystem" if company else ""
                 tailored_summary = (
-                    f"Distinguished {target_role} and Frontend Architect with 7+ years of engineering leadership designing "
-                    f"high-performance, reliable, and accessible enterprise web platforms{company_target}. "
-                    f"Deep technical mastery across {top_matches}. Proven track record managing large-scale Nx monorepos, "
-                    f"driving Angular migrations (v15 to modern v20 standalone & signals), reducing duplicated frontend code by 35–40%, "
-                    f"and accelerating CI/CD build pipelines by 25–35%. Substantial international experience collaborating with distributed "
-                    f"European engineering teams, including Dutch enterprise client Maistering B.V. and AVEVA. "
-                    f"Adept at technical governance, cross-functional mentoring, and executing production-grade UI architecture."
+                    f"Distinguished {target_role} {years_phrase} engineering leadership designing "
+                    f"high-performance, reliable, and accessible enterprise software platforms{company_target}. "
+                    f"Deep technical mastery across {top_matches}.{achieve_phrase} "
+                    f"Substantial experience collaborating with {collab_scope}. "
+                    f"Adept at technical governance, cross-functional mentoring, and executing production-grade architecture."
                 )
             else:
                 tailored_summary = (
-                    f"Accomplished {target_role} with 7+ years of proven track record designing and architecting "
-                    f"high-scale enterprise web applications. Deep specialization in {top_matches}. "
-                    f"Extensive production experience modernizing complex legacy applications, optimizing Nx monorepos "
-                    f"(25–35% build speedups), and integrating AI-driven interfaces (LangChain, streaming systems). "
-                    f"Well-suited for driving frontend architecture, code quality, and high-performance user experiences{company_phrase}."
+                    f"Accomplished {target_role} {years_phrase} proven track record designing and architecting "
+                    f"high-scale enterprise applications. Deep specialization in {top_matches}.{achieve_phrase} "
+                    f"Well-suited for driving system architecture, code quality, and high-performance user experiences{company_phrase}."
                 )
 
         # Re-prioritize skills: Put primary matches first
@@ -893,23 +1010,16 @@ class GeneratorChain:
                 reverse=True,
             )
             # Add executive scope and environment when in CV mode
-            comp_low = exp.company.lower()
-            scope = None
-            techs = []
-            if "aveva" in comp_low or "parnasoft" in comp_low:
-                scope = "Lead Frontend Architect responsible for enterprise Angular application modernization, Nx monorepo governance, and shared component infrastructure across European distributed teams."
-                techs = ["Angular 20", "Nx Monorepo", "Signals", "TypeScript", "Karma", "Cypress", "Playwright", "Azure DevOps", "Design Systems"]
-            elif "logistix" in comp_low or "aci" in comp_low:
-                scope = "Frontend Specialist driving legacy modernization from AngularJS to Angular 14+, enterprise state management, and cross-platform mobile delivery."
-                techs = ["Angular 14", "NgRx", "TypeScript", "Ionic", "Azure Artifacts", "RxJS", "Power Platform"]
-            elif "maistering" in comp_low:
-                scope = "Senior Frontend Engineer delivering enterprise AI applications and cross-platform mobile software for Netherlands-based enterprise clients."
-                techs = ["Angular", "NgRx", "TypeScript", ".NET Core", "Xamarin", "REST APIs", "Agile/Scrum"]
-            else:
-                scope = "Senior technical leader responsible for software architecture, code quality, and delivery of scalable applications."
+            scope = getattr(exp, "scope", None)
+            techs = getattr(exp, "technologies", None) or []
+            if doc_type == "cv" and not scope:
+                first_hl = exp.highlights[0] if exp.highlights else "delivering enterprise software solutions"
+                clean_hl = first_hl.rstrip(".")
+                scope = f"{exp.role} at {exp.company}, responsible for {clean_hl.lower()} and engineering governance across distributed teams."
+            if doc_type == "cv" and not techs:
                 techs = [m for m in audit.direct_matches if any(m.lower() in s for s in base_all_skills)][:6]
                 if not techs:
-                    techs = [s for s in (base.skills.get("Core Frontend Architecture & Frameworks") or base.skills.get("Core Engineering") or ["TypeScript", "Angular", "System Architecture"])][:5]
+                    techs = [s for s in (base.skills.get("Core Frontend Architecture & Frameworks") or base.skills.get("Core Engineering") or ["TypeScript", "System Architecture"])][:5]
 
             new_experience.append(
                 ExperienceItem(
@@ -1031,14 +1141,26 @@ class GeneratorChain:
             f"architectural foundations, deliberate performance optimization, and an unwavering focus on user experience."
         )
 
+        eu_companies = [
+            exp.company.split("—")[0].strip()
+            for exp in base.experience
+            if any(w in (exp.company + " " + (exp.location or "")).lower() for w in ["europe", "netherlands", "dutch", "uk", "germany", "maistering", "aveva"])
+        ]
+        has_dutch_exp = any(
+            any(w in (exp.company + " " + (exp.location or "")).lower() for w in ["maistering", "netherlands", "dutch", "amsterdam"])
+            for exp in base.experience
+        ) or "netherlands" in (base.summary or "").lower()
+
         if is_dutch and has_dutch_exp:
+            dutch_ref = f"including {eu_companies[0]}" if eu_companies else "including Netherlands-based enterprise partners"
             culture_note = (
-                "Having collaborated extensively with Dutch enterprise organizations—including Netherlands-based client Maistering B.V.—I "
+                f"Having collaborated extensively with Dutch enterprise organizations—{dutch_ref}—I "
                 "deeply appreciate the direct communication, pragmatic craftsmanship, and architectural autonomy that define Dutch engineering teams."
             )
-        elif is_european:
+        elif is_european and eu_companies:
+            eu_ref = f"including {', '.join(eu_companies[:2])}"
             culture_note = (
-                "Having led frontend initiatives across distributed European engineering organizations (including AVEVA and Maistering B.V.), "
+                f"Having led engineering initiatives across distributed European organizations ({eu_ref}), "
                 "I thrive in collaborative, high-autonomy environments that prioritize architectural clarity and cross-functional momentum."
             )
         else:
@@ -1065,17 +1187,33 @@ class GeneratorChain:
             top_skills = "scalable system architecture, automated testing, and disciplined software governance"
             role_intent = f"the technical challenges of the {target_role} initiatives"
         else:
-            top_skills = ", ".join(audit.direct_matches[:3]) if audit.direct_matches else "modern Angular, reactive Signals, and TypeScript"
+            top_skills = ", ".join(audit.direct_matches[:3]) if audit.direct_matches else "modern software architecture and engineering excellence"
             role_intent = f"the technical objectives of the {target_role} position"
 
+        years_exp = self._extract_experience_years(base)
+        years_phrase = (
+            f"With over {years_exp} of hands-on software architecture and engineering leadership"
+            if "+" in years_exp or "year" in years_exp
+            else f"With {years_exp} of hands-on software architecture and engineering leadership"
+        )
+        recent_companies = self._extract_recent_companies(base)
+        comp_context = f"In my recent work with {' and '.join(recent_companies[:2])}, " if recent_companies else "Throughout my recent engineering engagements, "
+
+        achievements = self._extract_candidate_achievements(base, audit, max_items=2)
+        if achievements:
+            achieve_statement = f"I demonstrated a proven track record delivering results: {'; '.join(achievements)}."
+        else:
+            achieve_statement = "I spearheaded platform modernizations, elevated technical governance, and accelerated delivery velocity."
+
+        collab_scope = self._get_candidate_collaboration_scope(base)
+
         p1 = (
-            f"With over 7 years of hands-on software architecture and engineering leadership, I bring a verified track record that "
-            f"directly accelerates {role_intent} at {clean_comp}. In my recent roles at AVEVA "
-            f"and ACI Logistix, I spearheaded zero-downtime migrations to Angular 20 and reactive Signals, took full ownership of enterprise "
-            f"Nx monorepos supporting multi-application ecosystems, and cut build and test execution cycles by 25–35%."
+            f"{years_phrase}, I bring a verified track record that "
+            f"directly accelerates {role_intent} at {clean_comp}. {comp_context}"
+            f"{achieve_statement}"
         )
         p2 = (
-            f"Furthermore, my extensive experience collaborating with distributed European engineering teams ensures seamless cross-functional "
+            f"Furthermore, my extensive experience collaborating across {collab_scope} ensures seamless cross-functional "
             f"communication, proactive code quality governance, and immediate technical velocity. Having modernized legacy platforms into "
             f"resilient, modular systems using {top_skills}, I am equipped to dive in from day one—elevating engineering standards, "
             f"optimizing performance, and executing your platform roadmap with confidence."
@@ -1112,12 +1250,35 @@ class GeneratorChain:
         else:
             p1 += f" I am drawn to {clean_comp}'s engineering culture, technical ambition, and focus on {culture}."
 
-        # Paragraph 2: Core verified track record & direct relevance
-        p2 = (
-            f"With over 7 years of engineering experience, my background centers on architecting resilient, high-scale "
-            f"web platforms, standardizing multi-app Nx monorepos (cutting CI/CD pipeline cycles by 25–35%), and publishing modular UI design systems. "
-            f"Having led enterprise modernizations and collaborated closely with European distributed teams, I bring deep hands-on mastery in {matched_str}."
+        # Paragraph 2: Core verified track record & direct relevance (Dynamically extracted)
+        years_exp = self._extract_experience_years(base)
+        years_phrase = (
+            f"With over {years_exp} of engineering experience"
+            if "+" in years_exp or "year" in years_exp
+            else f"With {years_exp} engineering experience"
         )
+        collab_scope = self._get_candidate_collaboration_scope(base)
+        achievements = self._extract_candidate_achievements(base, audit, max_items=2)
+
+        if achievements:
+            achieve_text = "; ".join(achievements)
+            p2 = (
+                f"{years_phrase}, my track record centers on delivering verified, high-impact solutions—"
+                f"including {achieve_text}. Having collaborated closely across {collab_scope}, "
+                f"I bring deep hands-on mastery in {matched_str}."
+            )
+        else:
+            summary_clean = re.sub(
+                r"^(?:[A-Za-z\s]+with\s+\d+\+?\s*years(?:\s+of)?\s+experience\s+(?:in|building)?\s*)",
+                "",
+                base.summary or "",
+                flags=re.I,
+            ).strip()
+            summary_snippet = summary_clean[:180].rstrip(".") if summary_clean else "delivering robust, high-performance software systems"
+            p2 = (
+                f"{years_phrase}, my background centers on {summary_snippet}. "
+                f"Having collaborated closely across {collab_scope}, I bring deep hands-on mastery in {matched_str}."
+            )
 
         # Paragraph 3: Why this role & excitement
         p3 = (
@@ -1179,17 +1340,31 @@ class GeneratorChain:
                     "STRICT CONSTRAINTS:\n"
                     "1. Length: Exactly 140 to 200 words (fits LinkedIn Easy Apply & Greenhouse limits).\n"
                     "2. Express genuine, specific interest in the target company's mission and engineering challenges.\n"
-                    "3. Highlight candidate's verified achievements (e.g. enterprise architecture, 25-35% CI/CD speedup, design systems, reliability) and directly connect them to the target role.\n"
+                    "3. Highlight candidate's actual verified achievements and metrics directly from the provided profile (never invent numbers, companies, or projects), connecting them to the target role.\n"
                     "4. STRICT ZERO HALLUCINATION: Only reference candidate's verified background. Never invent tools, skills, or employers.\n"
                     "5. Output ONLY the raw plain text message with salutation and sign-off. Do not enclose in markdown code blocks."
                 )
+
+                achievements_bullets = "\n".join(
+                    f"- {a}" for a in self._extract_candidate_achievements(base_resume, audit, max_items=3)
+                )
+                recent_roles = []
+                for exp in base_resume.experience[:3]:
+                    recent_roles.append(f"- {exp.role} at {exp.company} ({exp.period})")
+                roles_str = "\n".join(recent_roles)
+
                 user_msg = (
                     f"TARGET ROLE: {target_role}\n"
                     f"TARGET COMPANY: {target_company or 'Target Company'}\n"
                     f"COMPANY MISSION & CULTURE: {company_research_data.get('mission', '') if company_research_data else ''} | {company_research_data.get('culture', '') if company_research_data else ''}\n"
                     f"JOB SPECIFICATION EXCERPT:\n{job_text[:3000]}\n\n"
                     f"CANDIDATE NAME: {base_resume.name}\n"
+                    f"CANDIDATE TITLE: {base_resume.title}\n"
+                    f"CANDIDATE YEARS OF EXPERIENCE: {self._extract_experience_years(base_resume)}\n"
+                    f"CANDIDATE SUMMARY: {base_resume.summary}\n"
                     f"CANDIDATE TOP VERIFIED SKILLS: {', '.join(audit.direct_matches[:6])}\n"
+                    f"CANDIDATE RECENT ROLES:\n{roles_str}\n"
+                    f"CANDIDATE VERIFIED ACHIEVEMENTS:\n{achievements_bullets}\n"
                     f"CANDIDATE EMAIL: {base_resume.email or ''}\n"
                     f"CANDIDATE LINKEDIN: {base_resume.linkedin or ''}\n"
                     f"CANDIDATE PORTFOLIO: {getattr(base_resume, 'portfolio', '') or ''}\n"
@@ -1635,18 +1810,23 @@ class GeneratorChain:
                     generated.projects = heuristic.projects
 
             # Ensure experience items have scope & technologies in CV mode
+            base_all_skills = [s for cat_s in (base.skills or {}).values() for s in cat_s]
             for idx, exp in enumerate(generated.experience):
-                if not getattr(exp, "scope", None) or not getattr(exp, "technologies", None):
-                    comp_low = exp.company.lower()
-                    if "aveva" in comp_low or "parnasoft" in comp_low:
-                        exp.scope = exp.scope or "Lead Frontend Architect responsible for enterprise Angular application modernization, Nx monorepo governance, and shared component infrastructure across European distributed teams."
-                        exp.technologies = exp.technologies or ["Angular 20", "Nx Monorepo", "Signals", "TypeScript", "Karma", "Cypress", "Playwright", "Azure DevOps", "Design Systems"]
-                    elif "logistix" in comp_low or "aci" in comp_low:
-                        exp.scope = exp.scope or "Frontend Specialist driving legacy modernization from AngularJS to Angular 14+, enterprise state management, and cross-platform mobile delivery."
-                        exp.technologies = exp.technologies or ["Angular 14", "NgRx", "TypeScript", "Ionic", "Azure Artifacts", "RxJS", "Power Platform"]
-                    elif "maistering" in comp_low:
-                        exp.scope = exp.scope or "Senior Frontend Engineer delivering enterprise AI applications and cross-platform mobile software for Netherlands-based enterprise clients."
-                        exp.technologies = exp.technologies or ["Angular", "NgRx", "TypeScript", ".NET Core", "Xamarin", "REST APIs", "Agile/Scrum"]
+                base_match = next((b for b in base.experience if b.company.strip().lower() == exp.company.strip().lower()), None)
+                if not getattr(exp, "scope", None):
+                    if base_match and getattr(base_match, "scope", None):
+                        exp.scope = base_match.scope
+                    else:
+                        first_hl = exp.highlights[0] if exp.highlights else "software engineering delivery"
+                        clean_hl = first_hl.rstrip(".")
+                        exp.scope = f"{exp.role} at {exp.company}, responsible for {clean_hl.lower()} and platform engineering across distributed squads."
+
+                if not getattr(exp, "technologies", None):
+                    if base_match and getattr(base_match, "technologies", None):
+                        exp.technologies = base_match.technologies
+                    else:
+                        matching_techs = [s for s in base_all_skills if any(s.lower() in h.lower() for h in exp.highlights)]
+                        exp.technologies = matching_techs[:7] if matching_techs else base_all_skills[:5]
 
         # 5. Verify Skills Invariance & Completeness
         base_skills_count = sum(len(v) for v in (base.skills or {}).values())

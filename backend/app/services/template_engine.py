@@ -1614,14 +1614,31 @@ class TemplateEngine:
         # Section 2: Why I am the Ideal Fit for Role? (1-2 impactful paragraphs)
         why_fit_raw = getattr(resume, "why_fit", None)
         if not why_fit_raw:
+            years_m = re.search(r"\b(\d+\+?\s*(?:years?|yrs?))\b", resume.summary or "", re.IGNORECASE)
+            years_str = years_m.group(1) if years_m else "extensive"
+            years_phrase = f"With over {years_str} of engineering depth" if "+" in years_str or "year" in years_str else f"With {years_str} engineering experience"
+
+            recent_comps = [exp.company.split("—")[0].strip() for exp in resume.experience[:2] if exp.company]
+            comp_phrase = f" In my recent work with {' and '.join(recent_comps)}," if recent_comps else ""
+
+            top_hls = [h.rstrip(".") for exp in resume.experience for h in exp.highlights[:1]][:2]
+            hl_phrase = f" I have a proven track record delivering results: {'; '.join(top_hls)}." if top_hls else ""
+
+            eu_comps = [
+                exp.company.split("—")[0].strip()
+                for exp in resume.experience
+                if any(w in (exp.company + " " + (exp.location or "")).lower() for w in ["maistering", "aveva", "europe", "netherlands", "dutch", "uk", "germany"])
+            ]
+            eu_joined = ", ".join(eu_comps[:2])
+            eu_mention = f"—including {eu_joined}— " if eu_comps else " "
+            collab_phrase = (
+                f" Furthermore, my substantial experience collaborating with distributed engineering teams {eu_mention}"
+                f"ensures I will hit the ground running, elevate code quality, and drive velocity across your engineering organization."
+            )
             why_fit_raw = (
-                f"With over 7 years of engineering depth leading frontend architecture and high-performance web applications, "
-                f"I bring a verified track record directly aligned with the technical demands of the {target_role} position. "
-                f"Having architected enterprise Nx monorepos, spearheaded zero-downtime migrations to modern reactive paradigms "
-                f"(Signals, standalone components, and Angular 20), and cut build cycles by 25–35%, I understand how to deliver resilient, "
-                f"maintainable systems at scale. Furthermore, my substantial experience collaborating with distributed European engineering "
-                f"teams—including Dutch enterprise clients like Maistering B.V. and AVEVA—ensures I will hit the ground running, elevate code "
-                f"quality, and drive velocity across your engineering organization."
+                f"{years_phrase} leading software architecture and high-performance applications, "
+                f"I bring a verified track record directly aligned with the technical demands of the {target_role} position."
+                f"{comp_phrase}{hl_phrase}{collab_phrase}"
             )
         base_summary = base_resume.summary if base_resume else ""
         rendered_why_fit = (
@@ -1785,18 +1802,38 @@ class TemplateEngine:
             """
 
         # European Enterprise Spotlight Banner
-        has_european_exp = any(
-            "maistering" in exp.company.lower() or "aveva" in exp.company.lower() or "europe" in exp.company.lower()
-            for exp in resume.experience
-        ) or "netherlands" in (resume.summary or "").lower() or "netherlands" in why_fit_raw.lower() or "netherlands" in (resume.raw_text or "").lower()
+        eu_companies = []
+        for exp in resume.experience:
+            all_exp_str = f"{exp.company} {exp.location or ''} {' '.join(exp.highlights)}".lower()
+            if any(w in all_exp_str for w in ["maistering", "aveva", "europe", "netherlands", "dutch", "uk", "germany"]):
+                clean_c = exp.company.split("—")[0].strip()
+                if ("netherlands" in all_exp_str or "dutch" in all_exp_str) and "netherlands" not in clean_c.lower():
+                    entry = f"{clean_c} (Netherlands)"
+                elif "germany" in all_exp_str and "germany" not in clean_c.lower():
+                    entry = f"{clean_c} (Germany)"
+                elif ("uk" in all_exp_str or "london" in all_exp_str) and "uk" not in clean_c.lower():
+                    entry = f"{clean_c} (UK)"
+                else:
+                    entry = clean_c
+                if entry not in eu_companies:
+                    eu_companies.append(entry)
+
+        has_european_exp = (
+            bool(eu_companies)
+            or "netherlands" in (resume.summary or "").lower()
+            or "netherlands" in (why_fit_raw or "").lower()
+            or "netherlands" in (getattr(resume, "raw_text", "") or "").lower()
+            or "europe" in (resume.summary or "").lower()
+        )
 
         european_spotlight_html = ""
         if has_european_exp:
-            european_spotlight_html = """
+            comp_ref = f"for European clients, including {', '.join(eu_companies[:2])}." if eu_companies else "across distributed European and international engineering environments."
+            european_spotlight_html = f"""
             <div class="cv-european-banner avoid-break">
                 <div class="eu-content">
                     <strong>European Enterprise &amp; International Delivery:</strong>
-                    Proven engineering track record delivering scalable web platforms for European clients, including Dutch enterprise organization Maistering B.V. (Netherlands) and AVEVA.
+                    Proven engineering track record delivering scalable web platforms {comp_ref}
                 </div>
             </div>
             """

@@ -603,7 +603,127 @@ React, Redux, Node.js, JavaScript, Cloud, CI/CD, Agile.
             self.assertIn("Walmart", data["note"])
             self.assertGreater(data["word_count"], 50)
 
-        asyncio.run(run_asgi())
+    def test_dynamic_experience_years_extraction(self):
+        """Verifies _extract_experience_years correctly parses explicit text or calculates from experience dates."""
+        from datetime import datetime
+
+        # Case 1: Explicit 10+ years in summary
+        r1 = ResumeData(
+            name="Alice",
+            title="Senior Architect",
+            summary="Principal engineer with 10+ years of scalable systems design.",
+            experience=[]
+        )
+        self.assertEqual(generator_chain._extract_experience_years(r1), "10+ years")
+
+        # Case 2: Explicit 4 years in summary (normalizes to 4+ years)
+        r2 = ResumeData(
+            name="Bob",
+            title="Engineer",
+            summary="Software engineer with 4 years experience.",
+            experience=[]
+        )
+        self.assertEqual(generator_chain._extract_experience_years(r2), "4+ years")
+
+        # Case 3: No years in summary, calculated from period (2020 to Present)
+        current_year = datetime.now().year
+        expected_diff = current_year - 2020
+        r3 = ResumeData(
+            name="Charlie",
+            title="Developer",
+            summary="Passionate backend engineer.",
+            experience=[
+                ExperienceItem(
+                    role="Dev",
+                    company="Stripe",
+                    period="2020 – Present",
+                    highlights=["Built payment routing"]
+                )
+            ]
+        )
+        self.assertEqual(generator_chain._extract_experience_years(r3), f"{expected_diff}+ years")
+
+    def test_dynamic_hiring_note_no_hardcoded_leak(self):
+        """Verifies candidate with unique profile gets dynamic content without any AVEVA or hardcoded stats."""
+        import asyncio
+        from backend.app.models.resume import JobInput
+
+        custom_candidate = ResumeData(
+            name="Devon Vance",
+            title="Distributed Systems Engineer",
+            summary="Distributed systems specialist with 4+ years scaling Kubernetes clusters and Rust microservices.",
+            email="devon@example.com",
+            linkedin="linkedin.com/in/devon-vance",
+            experience=[
+                ExperienceItem(
+                    role="Systems Engineer",
+                    company="Cloudflare",
+                    period="2022 – Present",
+                    highlights=["Optimized edge routing throughput by 45%", "Architected geo-distributed caching mesh"]
+                ),
+                ExperienceItem(
+                    role="Junior Developer",
+                    company="Datadog",
+                    period="2020 – 2022",
+                    highlights=["Maintained telemetry ingest pipelines"]
+                )
+            ],
+            skills={"Infrastructure": ["Rust", "Kubernetes", "gRPC"]}
+        )
+
+        job_input = JobInput(
+            job_description="Looking for a Distributed Systems Engineer at HashiCorp to work on Consul and Nomad.",
+            target_title="Distributed Systems Engineer"
+        )
+
+        async def run_check():
+            res = await generator_chain.generate_hiring_note(job_input, custom_candidate)
+            note = res["note"]
+            # Must mention HashiCorp and candidate details
+            self.assertIn("HashiCorp", note)
+            self.assertIn("Devon Vance", note)
+            self.assertIn("4+ years", note)
+            self.assertIn("Optimized edge routing throughput by 45%", note)
+            # MUST NOT contain hardcoded remnants from other profiles
+            self.assertNotIn("AVEVA", note)
+            self.assertNotIn("7 years", note)
+            self.assertNotIn("7+ years", note)
+            self.assertNotIn("Nx monorepo", note)
+            self.assertNotIn("25–35%", note)
+
+        asyncio.run(run_check())
+
+    def test_dynamic_why_fit_no_hardcoded_leak(self):
+        """Verifies _compose_why_fit dynamically incorporates candidate companies and highlights."""
+        from backend.app.models.resume import AlignmentReport
+        audit = AlignmentReport(
+            target_role="Platform Engineer",
+            match_score=85,
+            direct_matches=["Rust", "Kubernetes"],
+            missing_keywords=[]
+        )
+        custom_candidate = ResumeData(
+            name="Devon Vance",
+            title="Distributed Systems Engineer",
+            summary="Distributed systems specialist with 4+ years scaling Kubernetes clusters.",
+            experience=[
+                ExperienceItem(
+                    role="Systems Engineer",
+                    company="Cloudflare",
+                    period="2022 – Present",
+                    highlights=["Optimized edge routing throughput by 45%"]
+                )
+            ],
+            skills={"Infrastructure": ["Rust", "Kubernetes"]}
+        )
+
+        fit_text = generator_chain._compose_why_fit("HashiCorp", "Platform Engineer", custom_candidate, audit)
+        self.assertIn("4+ years", fit_text)
+        self.assertIn("Cloudflare", fit_text)
+        self.assertIn("Optimized edge routing throughput by 45%", fit_text)
+        self.assertNotIn("AVEVA", fit_text)
+        self.assertNotIn("ACI Logistix", fit_text)
+        self.assertNotIn("7 years", fit_text)
 
 
 if __name__ == "__main__":
