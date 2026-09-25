@@ -1,3 +1,19 @@
+:host {
+  display: none;
+}
+
+:host(.open) {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+:host(.open) > * {
+  pointer-events: auto;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

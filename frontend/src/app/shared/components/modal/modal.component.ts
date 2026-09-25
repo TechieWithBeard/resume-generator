@@ -7,6 +7,10 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   templateUrl: './modal.component.html',
   styleUrl: './modal.component.scss',
+  host: {
+    '[class.open]': 'isOpen',
+    '[style.display]': 'isOpen ? "block" : "none"',
+  },
 })
 export class ModalComponent {
   @Input() isOpen: boolean = false;

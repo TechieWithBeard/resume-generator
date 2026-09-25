@@ -3,6 +3,7 @@ Data models for the AI-Powered Resume Generator.
 Strict Pydantic models for validation, serialization, and typing.
 """
 
+import re
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
@@ -65,6 +66,65 @@ class CertificationItem(BaseModel):
         return v_clean
 
 
+def format_job_title(title: Optional[str]) -> str:
+    """
+    Normalizes and professionalizes a job title string into proper Title Case,
+    preserving technical acronyms (UI, UX, AI, ML, CI/CD, AWS, etc.) and
+    cleaning awkward lowercase formatting (e.g. 'frontend engineer' -> 'Frontend Engineer').
+    """
+    if not title or not isinstance(title, str):
+        return "Senior Frontend Engineer"
+
+    clean = title.strip().strip("—–-|:•,; \t\n")
+    if not clean:
+        return "Senior Frontend Engineer"
+
+    acronym_map = {
+        "ui": "UI",
+        "ux": "UX",
+        "ui/ux": "UI/UX",
+        "ai": "AI",
+        "ml": "ML",
+        "api": "API",
+        "apis": "APIs",
+        "ci/cd": "CI/CD",
+        "cicd": "CI/CD",
+        "qa": "QA",
+        "aws": "AWS",
+        "gcp": "GCP",
+        "devops": "DevOps",
+        "ios": "iOS",
+        "rxjs": "RxJS",
+        "it": "IT",
+        "iot": "IoT",
+        "saas": "SaaS",
+    }
+
+    minor_words = {"and", "or", "of", "in", "for", "with", "the", "at", "to", "&"}
+
+    tokens = clean.split()
+    formatted_tokens = []
+
+    for i, token in enumerate(tokens):
+        lower_token = token.lower()
+        if lower_token in acronym_map:
+            formatted_tokens.append(acronym_map[lower_token])
+        elif "/" in token:
+            parts = token.split("/")
+            formatted_parts = [acronym_map.get(p.lower(), p.capitalize()) for p in parts]
+            formatted_tokens.append("/".join(formatted_parts))
+        elif "-" in token:
+            parts = token.split("-")
+            formatted_parts = [acronym_map.get(p.lower(), p.capitalize()) for p in parts]
+            formatted_tokens.append("-".join(formatted_parts))
+        elif i > 0 and lower_token in minor_words:
+            formatted_tokens.append(lower_token)
+        else:
+            formatted_tokens.append(token.capitalize())
+
+    return " ".join(formatted_tokens)
+
+
 class ResumeData(BaseModel):
     name: str
     title: str
@@ -81,6 +141,26 @@ class ResumeData(BaseModel):
     education: List[EducationItem] = Field(default_factory=list)
     skills: Dict[str, List[str]] = Field(default_factory=dict)
     projects: List[ProjectItem] = Field(default_factory=list)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def sanitize_title(cls, v: Any) -> str:
+        return format_job_title(v)
+
+    @field_validator("target_role", mode="before")
+    @classmethod
+    def sanitize_target_role(cls, v: Any) -> Optional[str]:
+        if not v or not isinstance(v, str) or not v.strip():
+            return None
+        return format_job_title(v)
+
+    @field_validator("tagline", mode="before")
+    @classmethod
+    def sanitize_tagline(cls, v: Any) -> str:
+        if not v or not isinstance(v, str):
+            return ""
+        clean = re.sub(r"\s*•?\s*Aligned for\s+[^•]+", "", v, flags=re.IGNORECASE).strip(" •")
+        return clean
 
     @field_validator("skills", mode="before")
     @classmethod
@@ -123,6 +203,13 @@ class JobInput(BaseModel):
     target_title: Optional[str] = None
     document_type: Literal["resume", "cv"] = "resume"
     human_guidance: Optional[Dict[str, Any]] = None
+
+    @field_validator("target_title", mode="before")
+    @classmethod
+    def sanitize_target_title(cls, v: Any) -> Optional[str]:
+        if not v or not isinstance(v, str) or not v.strip():
+            return None
+        return format_job_title(v)
 
 
 class LLMConfig(BaseModel):

@@ -21,6 +21,7 @@ from backend.app.models.resume import (
     LLMConfig,
     PreflightReport,
     ResumeData,
+    format_job_title,
 )
 from backend.app.services.template_engine import template_engine
 
@@ -592,6 +593,7 @@ class GeneratorChain:
                 re.I,
             )
             role = role_match.group(1).strip() if role_match else "Senior Frontend Engineer"
+        role = format_job_title(role)
 
         # 4. Domain Competency Inference for Short Headlines
         if len(found_tech) < 4:
@@ -921,16 +923,14 @@ class GeneratorChain:
                 )
             )
 
+        formatted_role = format_job_title(target_role)
+
         if is_mismatch:
             tagline = "Software Engineering Architecture • Disciplined Systems & Scalability"
-            if company:
-                tagline += f" • Aligned for {company}"
         elif doc_type == "cv":
             tagline = f"Senior Frontend Architecture • {', '.join(audit.direct_matches[:3]) if audit.direct_matches else 'Angular & Scalable Web Platforms'}"
         else:
             tagline = f"Enterprise Architecture • {', '.join(audit.direct_matches[:3]) if audit.direct_matches else 'Scalable UI'}"
-            if company:
-                tagline += f" • Aligned for {company}"
 
         # Preserve genuine architectural projects from base profile if present
         cv_projects = list(base.projects or [])
@@ -942,12 +942,12 @@ class GeneratorChain:
         why_company = ""
         why_fit = ""
         if doc_type == "cv":
-            why_company = self._compose_why_company(company, company_research, target_role, base)
-            why_fit = self._compose_why_fit(company, target_role, base, audit)
+            why_company = self._compose_why_company(company, company_research, formatted_role, base)
+            why_fit = self._compose_why_fit(company, formatted_role, base, audit)
 
         return ResumeData(
             name=base.name,
-            title=target_role,
+            title=formatted_role,
             tagline=tagline,
             location=base.location,
             email=base.email,

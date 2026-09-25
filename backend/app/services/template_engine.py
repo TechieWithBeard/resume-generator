@@ -11,7 +11,7 @@ import difflib
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
-from backend.app.models.resume import ResumeData, TemplateConfig
+from backend.app.models.resume import ResumeData, TemplateConfig, format_job_title
 
 
 class TemplateEngine:
@@ -664,11 +664,9 @@ class TemplateEngine:
         # 1. Summary
         summary_headline_parts = []
         if resume.title:
-            summary_headline_parts.append(resume.title)
+            summary_headline_parts.append(format_job_title(resume.title))
         if getattr(resume, "skills", None) and "frontendArchitecture" in resume.skills:
             summary_headline_parts.append(", ".join(resume.skills["frontendArchitecture"][:3]))
-        if getattr(resume, "target_company", None):
-            summary_headline_parts.append(f"Aligned for {resume.target_company}")
         summary_headline_str = " &bull; ".join(summary_headline_parts) if summary_headline_parts else ""
         summary_headline_html = f'<div class="summary-headline">{summary_headline_str}</div>' if summary_headline_str else ''
 
@@ -767,6 +765,11 @@ class TemplateEngine:
                 {edu_entries}
             </div>
             """
+
+        display_title = format_job_title(resume.title)
+        display_tagline = re.sub(r"\s*•?\s*Aligned for\s+[^•]+", "", resume.tagline or "", flags=re.IGNORECASE).strip(" •")
+        tagline_html = f" • {display_tagline}" if (config is None or config.show_tagline) and display_tagline else ""
+        header_title_tagline_html = f'<div class="title-tagline">{display_title}{tagline_html}</div>' if display_title else ''
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -1170,7 +1173,7 @@ class TemplateEngine:
   <div class="header">
     <div class="header-info">
       <div class="name">{resume.name}</div>
-      {f'<div class="title-tagline">{resume.title}' + (f' • {resume.tagline}' if (config is None or config.show_tagline) and resume.tagline else '') + '</div>' if resume.title else ''}
+      {header_title_tagline_html}
     </div>
     <div class="contacts">{contact_html}</div>
   </div>
@@ -1365,7 +1368,9 @@ class TemplateEngine:
                 url_str = f' <a href="{cert.url}" target="_blank">🔗</a>' if self._is_valid_url(cert.url) else ""
                 cert_html += f'<div style="font-size: 9.5pt; margin-bottom: 4px;"><strong>{cert.name}</strong> — {cert.issuer}{yr}{url_str}</div>'
 
-        tagline_html = f" • {resume.tagline}" if (config is None or config.show_tagline) and resume.tagline else ""
+        display_title = format_job_title(resume.title)
+        display_tagline = re.sub(r"\s*•?\s*Aligned for\s+[^•]+", "", resume.tagline or "", flags=re.IGNORECASE).strip(" •")
+        tagline_html = f" • {display_tagline}" if (config is None or config.show_tagline) and display_tagline else ""
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -1457,7 +1462,7 @@ class TemplateEngine:
   <div class="header">
     <div class="header-info">
       <h1 class="name">{resume.name}</h1>
-      <div class="title-tagline">{resume.title}{tagline_html}</div>
+      <div class="title-tagline">{display_title}{tagline_html}</div>
     </div>
     <div class="contacts">{contact_html}</div>
   </div>
@@ -1541,7 +1546,7 @@ class TemplateEngine:
             contacts.append(f'<a href="{p_href}" target="_blank" rel="noopener noreferrer" class="contact-item">{icon}Portfolio</a>')
         contact_html = " &bull; ".join(contacts)
 
-        target_role = getattr(resume, "target_role", None) or resume.title or "Target Role"
+        target_role = format_job_title(getattr(resume, "target_role", None) or resume.title or "Target Role")
         target_company = getattr(resume, "target_company", None) or "Target Organization"
 
         # Key target keywords for diff highlighting
@@ -1785,6 +1790,10 @@ class TemplateEngine:
             """
 
         current_date_str = datetime.now().strftime("%B %d, %Y")
+
+        display_title = format_job_title(resume.title)
+        display_tagline = re.sub(r"\s*•?\s*Aligned for\s+[^•]+", "", resume.tagline or "", flags=re.IGNORECASE).strip(" •")
+        tagline_html = f" • {display_tagline}" if (config is None or config.show_tagline) and display_tagline else ""
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -2491,7 +2500,7 @@ class TemplateEngine:
         <h1 class="name">{resume.name}</h1>
         <span class="header-doc-type">Curriculum Vitae</span>
       </div>
-      <div class="title-tagline">{resume.title}{f" • {resume.tagline}" if (config is None or config.show_tagline) and resume.tagline else ""}</div>
+      <div class="title-tagline">{display_title}{tagline_html}</div>
     </div>
     <div class="contacts">{contact_html}</div>
   </header>
@@ -2544,7 +2553,7 @@ class TemplateEngine:
   <div class="cv-signoff-block avoid-break">
     <div class="signoff-salutation">Respectfully submitted,</div>
     <div class="signoff-name">{resume.name}</div>
-    <div class="signoff-title">{resume.title or target_role}</div>
+    <div class="signoff-title">{display_title or target_role}</div>
   </div>
 
   <footer class="cv-footer avoid-break">
