@@ -310,6 +310,11 @@ class AtsFormattingCheckpoint:
             if not any(kw in rendered_html.lower() for kw in keywords):
                 defects.append(f"Missing required section: '{sec_name}'")
 
+        # 1.1 Experience Highlights Presence Check
+        for exp in tailored_resume.experience:
+            if not exp.highlights or not any(h.strip() for h in exp.highlights):
+                defects.append(f"Experience entry for '{exp.company}' has 0 bullet points in tailored resume")
+
         # 2. ATS Inline Skills Architecture Check
         # Ensures skills are rendered in clean categorized rows or high-density skill pills
         has_skill_row = (

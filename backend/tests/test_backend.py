@@ -442,7 +442,105 @@ Founded in 1948, Lely is committed to a sustainable, profitable, and enjoyable f
             self.assertIn("Frontend Engineer", html)
 
 
+    def test_anti_hallucination_restores_empty_experience_highlights(self):
+        """Verifies that _verify_anti_hallucination restores highlights from ground truth when omitted by LLM."""
+        from backend.app.models.resume import ExperienceItem
+
+        # Simulate LLM output where highlights are empty
+        stripped_exp = [
+            ExperienceItem(
+                role=exp.role,
+                company=exp.company,
+                period=exp.period,
+                location=exp.location,
+                highlights=[],  # Empty!
+            )
+            for exp in self.sample_base.experience
+        ]
+        test_resume = self.sample_base.model_copy(deep=True)
+        test_resume.experience = stripped_exp
+
+        verified, audit = generator_chain._verify_anti_hallucination(self.sample_base, test_resume)
+
+        # Assert all highlights are restored
+        for idx, exp in enumerate(verified.experience):
+            self.assertGreater(len(exp.highlights), 0, f"Employer {exp.company} still has 0 highlights!")
+            self.assertEqual(len(exp.highlights), len(self.sample_base.experience[idx].highlights))
+
+        # Check audit item
+        highlight_audits = [a for a in audit if a.check == "Experience Highlights Completeness"]
+        self.assertTrue(len(highlight_audits) > 0)
+        self.assertEqual(highlight_audits[0].status, "WARNING")
+        self.assertIn("Restored", highlight_audits[0].details)
+
+    def test_anti_hallucination_restores_omitted_employers(self):
+        """Verifies that _verify_anti_hallucination restores employers if an LLM drops any."""
+        test_resume = self.sample_base.model_copy(deep=True)
+        # Drop the last employer
+        test_resume.experience = [self.sample_base.experience[0].model_copy(deep=True)]
+
+        verified, audit = generator_chain._verify_anti_hallucination(self.sample_base, test_resume)
+        self.assertEqual(len(verified.experience), len(self.sample_base.experience))
+
+    def test_template_engine_highlights_fallback_renders_bullets(self):
+        """Verifies that template engine safely renders base bullets if highlights are missing."""
+        from backend.app.models.resume import ExperienceItem
+
+        resume_no_bullets = self.sample_base.model_copy(deep=True)
+        for exp in resume_no_bullets.experience:
+            exp.highlights = []
+
+        for template_id in ["modern", "executive", "compact", "cv_executive"]:
+            html = template_engine.render(resume_no_bullets, template_id=template_id, base_resume=self.sample_base)
+            # Must contain bullet points from base resume
+            self.assertIn("<li", html, f"Template {template_id} failed to render bullet points!")
+            self.assertIn("Angular", html)
+
+    def test_walmart_job_alignment_experience_preserved(self):
+        """Verifies that Walmart JD alignment preserves rich experience highlights across templates."""
+        walmart_jd = """About the job
+Job Description Summary:
+Responsible for coding, unit testing, building high performance and scalable applications that meet the needs of millions of Walmart-International customers, in the areas of supply chain management & Customer experience.
+Requirements:
+React, Redux, Node.js, JavaScript, Cloud, CI/CD, Agile.
+"""
+        keywords, target_role, comp, loc = generator_chain._extract_job_keywords(walmart_jd, "Software Engineer")
+        audit = generator_chain._perform_competency_audit(self.sample_base, keywords, target_role)
+        aligned = generator_chain._align_resume_heuristically(
+            self.sample_base, audit, target_role=target_role, company=comp
+        )
+
+        # 1. Test with sample_base
+        self.assertGreater(len(aligned.experience), 0)
+        for exp in aligned.experience:
+            self.assertGreater(len(exp.highlights), 0, f"Employer {exp.company} has 0 highlights for Walmart JD!")
+
+        html_sample = template_engine.render(aligned, template_id="modern", base_resume=self.sample_base)
+        self.assertIn("Alpha Corp", html_sample)
+        self.assertIn("Beta LLC", html_sample)
+        self.assertIn("class=\"exp-highlights\"", html_sample)
+        self.assertIn("<li", html_sample)
+
+        # 2. Test with real ground truth resume from resume_store
+        real_base = resume_store.get_base_resume()
+        audit_real = generator_chain._perform_competency_audit(real_base, keywords, target_role)
+        aligned_real = generator_chain._align_resume_heuristically(
+            real_base, audit_real, target_role=target_role, company=comp
+        )
+        self.assertGreater(len(aligned_real.experience), 0)
+        for exp in aligned_real.experience:
+            self.assertGreater(len(exp.highlights), 0, f"Employer {exp.company} has 0 highlights!")
+
+        html_real = template_engine.render(aligned_real, template_id="modern", base_resume=real_base)
+        self.assertIn("Parnasoft Technologies", html_real)
+        self.assertIn("ACI Logistix", html_real)
+        self.assertIn("Maistering B.V", html_real)
+        self.assertIn("class=\"exp-highlights\"", html_real)
+        self.assertIn("<li", html_real)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 

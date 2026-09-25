@@ -595,7 +595,11 @@ class TemplateEngine:
                 loc_client = f" - {exp.location}" if exp.location else ""
                 client_bullet = f'<li style="font-weight:600; color:#334155;">Client: {parts[1]}{loc_client}</li>\n'
 
-            for h in exp.highlights:
+            exp_bullets = [h for h in exp.highlights if h and h.strip()]
+            if not exp_bullets and relevant_base_bullets:
+                exp_bullets = relevant_base_bullets
+
+            for h in exp_bullets:
                 if highlight_diff:
                     h_rendered, is_modified, has_target_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
                     highlight_cls = "highlighted-bullet" if is_modified or has_target_kw else ""
@@ -1278,7 +1282,11 @@ class TemplateEngine:
             bullets = ""
             c_key = exp.company.strip().lower()
             relevant_base_bullets = base_bullets_by_company.get(c_key, all_base_bullets)
-            for h in exp.highlights:
+            exp_bullets = [h for h in exp.highlights if h and h.strip()]
+            if not exp_bullets and relevant_base_bullets:
+                exp_bullets = relevant_base_bullets
+
+            for h in exp_bullets:
                 if highlight_diff:
                     h_rendered, is_modified, has_target_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
                     highlight_cls = "highlighted-bullet" if is_modified or has_target_kw else ""
@@ -1647,7 +1655,10 @@ class TemplateEngine:
                 # Bullet points
                 b_html = ""
                 relevant_base_bullets = base_bullets_by_company.get(c_key, all_base_bullets)
-                for h in exp.highlights[:2]:
+                exp_bullets = [h for h in exp.highlights if h and h.strip()]
+                if not exp_bullets and relevant_base_bullets:
+                    exp_bullets = relevant_base_bullets
+                for h in exp_bullets[:2]:
                     if highlight_diff:
                         h_rendered, is_mod, has_kw = self.diff_bullet(h, relevant_base_bullets, target_terms)
                         cls = "highlighted-bullet" if is_mod or has_kw else ""

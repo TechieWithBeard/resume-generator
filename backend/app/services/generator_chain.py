@@ -1123,7 +1123,10 @@ class GeneratorChain:
                 "3. In the output JSON, you MUST generate two dedicated bespoke paragraphs:\n"
                 "   - 'why_company': 1 inspiring, authentic paragraph answering why the candidate wants to join this specific company, directly integrating the company's mission and engineering culture.\n"
                 "   - 'why_fit': 1 powerful paragraph explaining why the candidate is an exceptional fit for the target role, connecting verified achievements and technical mastery directly to the position.\n"
-                "4. Maintain and preserve projects, certifications, and publications from the base profile.\n\n"
+                "4. 'experience' and 'highlights' MANDATE: You MUST include ALL verified employers in 'experience'. "
+                "For EVERY employer, you MUST provide 4 to 7 comprehensive, quantified bullet points in 'highlights', plus 'scope' and 'technologies'. "
+                "DO NOT omit or return an empty 'highlights' array under any circumstances.\n"
+                "5. Maintain and preserve projects, certifications, and publications from the base profile.\n\n"
                 "TWO-PHASE OUTPUT REQUIREMENTS:\n"
                 "Phase 1: Write your Strategic Alignment Reasoning (3-5 concise sentences explaining the alignment strategy, "
                 "company synergy, and high-impact achievements elevated).\n"
@@ -1137,7 +1140,11 @@ class GeneratorChain:
                 "1. You MUST ONLY use the candidate's verified companies, employment dates, and educational credentials. "
                 "NEVER invent new employers or change dates.\n"
                 "2. You MUST NOT add skills or tools the candidate has never used. Only emphasize and highlight real skills.\n"
-                "3. Reframe bullet points to highlight measurable business impact, architecture decisions, and target keywords.\n"
+                "3. 'experience' and 'highlights' MANDATE: You MUST include ALL verified employers in 'experience'. "
+                "For EVERY employer, you MUST provide 3 to 6 comprehensive, impactful, quantified bullet points in 'highlights'. "
+                "DO NOT omit or return an empty 'highlights' array under any circumstances. "
+                "If the target role emphasizes tools outside the candidate's core stack, reframe their real achievements focusing on architectural depth, "
+                "systems thinking, scale, CI/CD speedups, and engineering rigor from their verified background rather than deleting bullets.\n"
                 "4. 'skills': MUST preserve all verified candidate skills grouped by category, reordering them so target keywords appear first. DO NOT omit or empty skills.\n\n"
                 "TWO-PHASE OUTPUT REQUIREMENTS:\n"
                 "Phase 1: Write your Strategic Alignment Reasoning (3-5 concise sentences explaining the alignment strategy, "
@@ -1165,6 +1172,8 @@ class GeneratorChain:
             f"VERIFIED CANDIDATE BASE PROFILE:\n{json.dumps(base.model_dump(), indent=2)}\n\n"
             f"VERIFIED DIRECT SKILLS:\n{', '.join(audit.direct_matches)}\n"
             f"{guidance_text}\n"
+            f"CRITICAL SCHEMA REQUIREMENT: The 'experience' array MUST contain ALL employers from the base profile, "
+            f"and each employer MUST have at least 3-6 detailed achievement bullet points in 'highlights'. DO NOT output empty 'highlights'.\n"
             f"INSTRUCTION: Begin with Phase 1 (Strategic Alignment Reasoning), followed immediately by Phase 2 (```json ... ```)."
         )
 
@@ -1295,29 +1304,116 @@ class GeneratorChain:
         """
         audit_items: List[AlignmentAuditItem] = []
 
-        # 1. Verify Employer Invariance
-        base_companies = {exp.company.strip().lower() for exp in base.experience}
-        gen_companies = {exp.company.strip().lower() for exp in generated.experience}
-        rogue_companies = gen_companies - base_companies
+        def _match_base_company(comp_name: str) -> Optional[ExperienceItem]:
+            c_low = comp_name.strip().lower()
+            for b in base.experience:
+                b_low = b.company.strip().lower()
+                if c_low == b_low:
+                    return b
+            c_base = re.split(r"\s+[—–-]\s+", c_low)[0].strip()
+            for b in base.experience:
+                b_base = re.split(r"\s+[—–-]\s+", b.company.strip().lower())[0].strip()
+                if c_base == b_base or c_base in b_base or b_base in c_base:
+                    return b
+            return None
 
-        if rogue_companies:
+        # 1. Verify Employer Invariance & Completeness
+        if not generated.experience:
             audit_items.append(
                 AlignmentAuditItem(
                     check="Employer Invariance",
                     status="WARNING",
-                    details=f"Detected unrecognized employer: {rogue_companies}. Resetting to ground truth employers.",
+                    details="Tailored resume omitted entire experience section. Restored 100% verified work history from ground truth.",
                 )
             )
-            # Revert companies
+            generated.experience = [exp.model_copy(deep=True) for exp in base.experience]
+        else:
+            # Check for rogue employers
+            rogue_companies = []
             for idx, exp in enumerate(generated.experience):
-                if idx < len(base.experience):
-                    exp.company = base.experience[idx].company
+                matched_b = _match_base_company(exp.company)
+                if not matched_b:
+                    rogue_companies.append(exp.company)
+                    if idx < len(base.experience):
+                        exp.company = base.experience[idx].company
+                        exp.role = base.experience[idx].role
+                        exp.period = base.experience[idx].period
+
+            if rogue_companies:
+                audit_items.append(
+                    AlignmentAuditItem(
+                        check="Employer Invariance",
+                        status="WARNING",
+                        details=f"Detected unrecognized employer: {rogue_companies}. Resetting to ground truth employers.",
+                    )
+                )
+            else:
+                audit_items.append(
+                    AlignmentAuditItem(
+                        check="Employer Invariance",
+                        status="PASSED",
+                        details=f"All {len(generated.experience)} employers verified against ground truth.",
+                    )
+                )
+
+            # Check if any ground truth employers were omitted
+            gen_matched_indices = set()
+            for exp in generated.experience:
+                matched_b = _match_base_company(exp.company)
+                if matched_b and matched_b in base.experience:
+                    gen_matched_indices.add(base.experience.index(matched_b))
+
+            missing_bases = [b for idx, b in enumerate(base.experience) if idx not in gen_matched_indices]
+            if missing_bases:
+                for b in missing_bases:
+                    generated.experience.append(b.model_copy(deep=True))
+                audit_items.append(
+                    AlignmentAuditItem(
+                        check="Employer Invariance",
+                        status="WARNING",
+                        details=f"Restored {len(missing_bases)} omitted employer(s) from ground truth: {[b.company for b in missing_bases]}.",
+                    )
+                )
+
+        # 1.5 Verify Experience Highlights Completeness & Quality
+        highlights_restored = 0
+        for idx, exp in enumerate(generated.experience):
+            matched_b = _match_base_company(exp.company)
+            if not matched_b and idx < len(base.experience):
+                matched_b = base.experience[idx]
+
+            valid_highlights = [h.strip() for h in (exp.highlights or []) if h and h.strip()]
+
+            if not valid_highlights and matched_b and matched_b.highlights:
+                exp.highlights = list(matched_b.highlights)
+                highlights_restored += 1
+            elif matched_b and len(valid_highlights) < 2 and len(matched_b.highlights) >= 2:
+                # Supplement with base highlights if LLM provided too few bullets
+                combined = list(valid_highlights)
+                for bh in matched_b.highlights:
+                    if bh not in combined:
+                        combined.append(bh)
+                    if len(combined) >= max(3, len(matched_b.highlights)):
+                        break
+                exp.highlights = combined
+                highlights_restored += 1
+            else:
+                exp.highlights = valid_highlights
+
+        if highlights_restored > 0:
+            audit_items.append(
+                AlignmentAuditItem(
+                    check="Experience Highlights Completeness",
+                    status="WARNING",
+                    details=f"Restored/supplemented verified highlights for {highlights_restored} employer(s) where tailored output had empty or truncated bullet points.",
+                )
+            )
         else:
             audit_items.append(
                 AlignmentAuditItem(
-                    check="Employer Invariance",
+                    check="Experience Highlights Completeness",
                     status="PASSED",
-                    details=f"All {len(gen_companies)} employers perfectly match ground truth.",
+                    details=f"All {len(generated.experience)} work history entries contain robust verified bullet points.",
                 )
             )
 
