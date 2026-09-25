@@ -1324,7 +1324,10 @@ class GeneratorChain:
             try:
                 from backend.app.services.company_research import company_research_tool
                 tool_input = {"company_name": target_company, "job_context": job_text}
-                company_research_data = company_research_tool.invoke(tool_input)
+                company_research_data = await asyncio.wait_for(
+                    asyncio.to_thread(company_research_tool.invoke, tool_input),
+                    timeout=2.0,
+                )
             except Exception:
                 pass
 
@@ -1369,7 +1372,10 @@ class GeneratorChain:
                     f"CANDIDATE LINKEDIN: {base_resume.linkedin or ''}\n"
                     f"CANDIDATE PORTFOLIO: {getattr(base_resume, 'portfolio', '') or ''}\n"
                 )
-                res = await llm.ainvoke([SystemMessage(content=system_prompt), HumanMessage(content=user_msg)])
+                res = await asyncio.wait_for(
+                    llm.ainvoke([SystemMessage(content=system_prompt), HumanMessage(content=user_msg)]),
+                    timeout=3.0,
+                )
                 raw_res = (res.content if hasattr(res, "content") else str(res)).strip()
                 raw_res = re.sub(r"^```(?:text|markdown)?\s*", "", raw_res)
                 raw_res = re.sub(r"\s*```$", "", raw_res).strip()

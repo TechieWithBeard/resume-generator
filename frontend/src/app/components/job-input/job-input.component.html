@@ -176,6 +176,7 @@
     <!-- Primary Action Button with Source of Truth Guidance -->
     <button
       type="button"
+      data-testid="generate-btn"
       class="w-full py-3 px-4 rounded-xl text-xs sm:text-sm font-bold text-white shadow-md active:scale-[0.99] transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
       [ngClass]="!hasBaseResume() ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 shadow-amber-500/25' : (!hasJobRequirements() ? 'bg-slate-400 cursor-not-allowed' : (documentMode() === 'cv' ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 shadow-indigo-600/25' : 'bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-500 hover:to-sky-600 shadow-sky-600/25'))"
       (click)="onGenerate()"
@@ -202,10 +203,11 @@
     <div class="pt-2 border-t border-slate-200/60 mt-1">
       <button
         type="button"
+        data-testid="generate-hiring-note-btn"
         class="w-full py-2.5 px-3.5 rounded-xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-sky-50/20 to-indigo-50/20 hover:from-sky-50/60 hover:to-indigo-50/40 hover:border-sky-300 transition-all duration-150 flex items-center justify-between text-left group cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
         (click)="onGenerateHiringNote()"
         [disabled]="!canGenerate() || isGeneratingNote() || isStreaming()"
-        title="Generate a personalized note for the recruiter or hiring manager (fits LinkedIn Easy Apply)"
+        title="Draft a personalized note for the recruiter or hiring manager (fits LinkedIn Easy Apply)"
       >
         <div class="flex items-center gap-2.5">
           <span class="text-base p-1.5 bg-white rounded-lg border border-slate-200 shadow-2xs group-hover:scale-105 transition-transform">✉️</span>
@@ -223,7 +225,7 @@
             <span class="w-3.5 h-3.5 border-2 border-sky-600/30 border-t-sky-600 rounded-full animate-spin"></span>
             <span>Writing...</span>
           } @else {
-            <span>Generate Note</span>
+            <span>Draft Note</span>
             <span>→</span>
           }
         </div>
@@ -420,6 +422,7 @@
 @if (showHiringNoteModal()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-fadeIn">
     <div
+      data-testid="hiring-note-modal"
       class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full overflow-hidden animate-scaleUp flex flex-col max-h-[90vh]"
       role="dialog"
       aria-modal="true"

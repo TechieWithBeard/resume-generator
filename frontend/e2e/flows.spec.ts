@@ -16,18 +16,18 @@ test.describe('Resume Architect - End-to-End User Flows', () => {
     // Check Ground Truth status in header
     const headerGroundTruthBtn = page.locator('header button').filter({ hasText: 'Source of Truth' });
     await expect(headerGroundTruthBtn).toBeVisible();
-    await expect(headerGroundTruthBtn).toContainText('Alex Mercer');
+    await expect(headerGroundTruthBtn).toContainText(/(Alex Mercer|Vishnu Thankappan)/);
 
     // Check Source of Truth card in Job Input
     const truthCard = page.locator('div').filter({ hasText: 'Source of Truth' }).first();
     await expect(truthCard).toBeVisible();
     await expect(page.getByText('✓ Loaded & Grounded')).toBeVisible();
-    await expect(page.getByText(/Alex Mercer • \d+ verified roles/)).toBeVisible();
+    await expect(page.getByText(/(Alex Mercer|Vishnu Thankappan) • \d+ verified roles/)).toBeVisible();
 
     // Check preview iframe has rendered
     const previewIframe = page.frameLocator('iframe[title="Resume Live Preview"]');
     await expect(previewIframe.locator('body')).toBeVisible({ timeout: 10000 });
-    await expect(previewIframe.getByText('Alex Mercer')).toBeVisible();
+    await expect(previewIframe.getByText(/(Alex Mercer|Vishnu Thankappan)/)).toBeVisible();
   });
 
   test('Flow 2: Ground Truth Modal - Inspect, Tab Navigation, and Save', async ({ page }) => {
@@ -42,14 +42,14 @@ test.describe('Resume Architect - End-to-End User Flows', () => {
 
     // Verify form fields
     const nameInput = modal.locator('input[type="text"]').first();
-    await expect(nameInput).toHaveValue('Alex Mercer');
+    await expect(nameInput).toHaveValue(/(Alex Mercer|Vishnu Thankappan)/);
 
     // Test tab navigation: Structured Profile -> Raw Knowledge Base -> JSON Schema
     await modal.getByRole('button', { name: /Raw Knowledge Base/ }).click();
-    await expect(modal.locator('textarea')).toBeVisible();
+    await expect(modal.locator('textarea').first()).toBeVisible();
 
     await modal.getByRole('button', { name: /JSON Schema/ }).click();
-    await expect(modal.locator('textarea')).toBeVisible();
+    await expect(modal.locator('textarea').first()).toBeVisible();
 
     // Switch back to Structured Profile
     await modal.getByRole('button', { name: /Structured Profile/ }).click();
@@ -106,7 +106,7 @@ test.describe('Resume Architect - End-to-End User Flows', () => {
     await page.locator('#targetTitle').fill('Embedded Firmware Engineer');
 
     // Generate button is now enabled
-    const generateBtn = page.locator('app-job-input button').filter({ hasText: /Generate/ });
+    const generateBtn = page.locator('button[data-testid="generate-btn"]');
     await expect(generateBtn).toBeEnabled();
     await generateBtn.click();
 
@@ -153,7 +153,7 @@ test.describe('Resume Architect - End-to-End User Flows', () => {
     await titleInput.fill('Senior Staff Frontend Engineer');
 
     // Trigger generation
-    const generateBtn = page.locator('app-job-input button').filter({ hasText: /Generate/ });
+    const generateBtn = page.locator('button[data-testid="generate-btn"]');
     await generateBtn.click();
 
     // Verify Stream Console displays active steps
@@ -172,7 +172,7 @@ test.describe('Resume Architect - End-to-End User Flows', () => {
     // Verify preview iframe contains updated tailored resume
     const previewIframe = page.frameLocator('iframe[title="Resume Live Preview"]');
     await expect(previewIframe.locator('body')).toBeVisible();
-    await expect(previewIframe.getByText('Alex Mercer')).toBeVisible();
+    await expect(previewIframe.getByText(/(Alex Mercer|Vishnu Thankappan)/)).toBeVisible();
   });
 
   test('Flow 6: View Mode Switcher (Single, Split Comparison, and Git Diff)', async ({ page }) => {
@@ -186,7 +186,7 @@ test.describe('Resume Architect - End-to-End User Flows', () => {
 
     const baseIframe = page.frameLocator('iframe[title="Base Resume Source of Truth"]');
     await expect(baseIframe.locator('body')).toBeVisible();
-    await expect(baseIframe.getByText('Alex Mercer')).toBeVisible();
+    await expect(baseIframe.getByText(/(Alex Mercer|Vishnu Thankappan)/)).toBeVisible();
 
     // Click 'Text Diff'
     await page.getByRole('button', { name: /Text Diff/ }).click();
@@ -301,5 +301,44 @@ test.describe('Resume Architect - End-to-End User Flows', () => {
       expect(dimensions[dim]).toHaveProperty('passed');
       expect(dimensions[dim]).toHaveProperty('feedback');
     }
+  });
+
+  test('Flow 11: Message to the Hiring Team Modal & Note Generation', async ({ page }) => {
+    // Fill relevant Job Description
+    const targetJD = `
+      Senior Frontend Architect:
+      We are looking for a Senior Frontend Architect to lead enterprise web applications.
+      Key Responsibilities:
+      - Architect scalable frontend platforms using TypeScript and Angular
+      - Optimize CI/CD pipelines and design systems
+    `;
+    await page.locator('#jobDesc').fill(targetJD);
+    await page.locator('#targetTitle').fill('Senior Frontend Architect');
+
+    // Click Message to the Hiring Team button
+    const hiringNoteBtn = page.locator('button[data-testid="generate-hiring-note-btn"]');
+    await expect(hiringNoteBtn).toBeVisible();
+    await expect(hiringNoteBtn).toBeEnabled();
+    await hiringNoteBtn.click();
+
+    // Verify modal appears
+    const modal = page.locator('[data-testid="hiring-note-modal"]');
+    await expect(modal).toBeVisible({ timeout: 25000 });
+
+    // Verify modal contents: textarea, role tag, copy button
+    const noteTextarea = modal.locator('textarea');
+    await expect(noteTextarea).toBeVisible();
+    const noteContent = await noteTextarea.inputValue();
+    expect(noteContent.length).toBeGreaterThan(50);
+
+    // Test Copy button
+    const copyBtn = modal.getByRole('button', { name: /Copy Message/ });
+    await expect(copyBtn).toBeVisible();
+    await copyBtn.click();
+    await expect(modal.getByText('✓ Copied to Clipboard!')).toBeVisible();
+
+    // Close modal
+    await modal.getByRole('button', { name: 'Close' }).click();
+    await expect(modal).not.toBeVisible();
   });
 });

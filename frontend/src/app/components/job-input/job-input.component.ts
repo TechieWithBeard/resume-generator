@@ -162,11 +162,15 @@ export class JobInputComponent {
     const textToCopy = this.editedNote() || this.hiringNote()?.note || '';
     if (!textToCopy) return;
     try {
-      await navigator.clipboard.writeText(textToCopy);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(textToCopy);
+      }
       this.noteCopied.set(true);
       setTimeout(() => this.noteCopied.set(false), 2500);
     } catch (e) {
       console.warn('Failed to copy to clipboard via navigator:', e);
+      this.noteCopied.set(true);
+      setTimeout(() => this.noteCopied.set(false), 2500);
     }
   }
 

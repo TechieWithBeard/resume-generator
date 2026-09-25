@@ -18,7 +18,7 @@ test.describe('Component-Level Interaction & DOM Structure Tests', () => {
     // 2. Ground Truth button
     const groundTruthBtn = header.locator('button').filter({ hasText: 'Source of Truth' });
     await expect(groundTruthBtn).toBeVisible();
-    await expect(groundTruthBtn).toContainText('Alex Mercer');
+    await expect(groundTruthBtn).toContainText(/(Alex Mercer|Vishnu Thankappan)/);
     await expect(groundTruthBtn.locator('span').filter({ hasText: 'Edit' })).toBeVisible();
 
     // 3. Settings button
@@ -62,6 +62,10 @@ test.describe('Component-Level Interaction & DOM Structure Tests', () => {
     await expect(jobInput.getByText('(50 characters)')).toBeVisible();
     const generateBtn = jobInput.getByRole('button', { name: /Generate Tailored ATS Resume/ });
     await expect(generateBtn).toBeVisible();
+
+    const hiringNoteBtn = jobInput.locator('button[data-testid="generate-hiring-note-btn"]');
+    await expect(hiringNoteBtn).toBeVisible();
+    await expect(hiringNoteBtn).toContainText('Message to the Hiring Team');
 
     // 5. Target Title Input
     const titleInput = jobInput.locator('#targetTitle');
